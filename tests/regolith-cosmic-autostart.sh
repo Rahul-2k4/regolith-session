@@ -217,8 +217,8 @@ export REGOLITH_COSMIC_DISABLE_PROCESS_CHECK=true
 export REGOLITH_COSMIC_OSD_DELAY_SECONDS=0.1
 start_regolith_cosmic_helpers
 
-if ! wait_for_log_entry 'systemctl argc=3 args=--user stop regolith-init-inputd.service'; then
-    echo "expected legacy input daemon to be stopped for the COSMIC session" >&2
+if ! wait_for_log_entry 'systemctl argc=5 args=--user mask --runtime --now regolith-init-inputd.service'; then
+    echo "expected legacy input daemon to be runtime-masked for the COSMIC session" >&2
     exit 1
 fi
 
@@ -227,8 +227,8 @@ if ! wait_for_log_entry 'systemctl argc=3 args=--user reset-failed regolith-init
     exit 1
 fi
 
-if ! wait_for_log_entry 'systemctl argc=3 args=--user stop regolith-init-displayd.service'; then
-    echo "expected legacy display daemon to be stopped for the COSMIC session" >&2
+if ! wait_for_log_entry 'systemctl argc=5 args=--user mask --runtime --now regolith-init-displayd.service'; then
+    echo "expected legacy display daemon to be runtime-masked for the COSMIC session" >&2
     exit 1
 fi
 

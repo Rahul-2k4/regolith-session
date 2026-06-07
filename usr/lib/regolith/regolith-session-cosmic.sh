@@ -50,9 +50,16 @@ regolith_cosmic_stop_user_service() {
     regolith_cosmic_user_systemctl reset-failed "$unit" >/dev/null 2>&1 || true
 }
 
+regolith_cosmic_runtime_mask_user_service() {
+    local unit="$1"
+
+    regolith_cosmic_user_systemctl mask --runtime --now "$unit" >/dev/null 2>&1 || true
+    regolith_cosmic_user_systemctl reset-failed "$unit" >/dev/null 2>&1 || true
+}
+
 regolith_cosmic_disable_legacy_helpers() {
-    regolith_cosmic_stop_user_service regolith-init-inputd.service
-    regolith_cosmic_stop_user_service regolith-init-displayd.service
+    regolith_cosmic_runtime_mask_user_service regolith-init-inputd.service
+    regolith_cosmic_runtime_mask_user_service regolith-init-displayd.service
 }
 
 regolith_cosmic_configure_status_bar() {
