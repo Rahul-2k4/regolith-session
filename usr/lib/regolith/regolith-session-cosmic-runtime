@@ -1,0 +1,16 @@
+#!/bin/bash
+# Start the Sway compositor for the experimental COSMIC session and only then
+# hand selected helper ownership to COSMIC-side processes.
+
+set -Eeu -o pipefail
+
+source /usr/lib/regolith/regolith-session-cosmic.sh
+
+"$@" &
+compositor_pid=$!
+
+if wait_for_regolith_cosmic_wayland_socket; then
+    start_regolith_cosmic_helpers
+fi
+
+wait "$compositor_pid"

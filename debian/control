@@ -79,6 +79,37 @@ Description: Regolith customized SwayWM session
  This package contains the desktop and wayland session configuration
  necessary to start a Regolith sway session.
 
+
+Package: regolith-session-cosmic
+Architecture: any
+Depends: ${misc:Depends},
+    cosmic-session,
+    dbus,
+    regolith-look-default,
+    regolith-session-common,
+    regolith-sway-root-config,
+    sway-regolith,
+    trawlcat,
+    trawld,
+    trawldb,
+    wl-clipboard,
+    xwayland
+Recommends:
+    cosmic-bg,
+    cosmic-idle,
+    cosmic-osd,
+    cosmic-settings,
+    cosmic-settings-daemon,
+    cosmolith,
+    regolith-wm-rofication-ilia,
+    xdg-desktop-portal-regolith-wayland-config
+Provides: regolith-desktop-session
+Conflicts: session-shortcuts
+Description: Experimental Regolith COSMIC Wayland session
+ This package contains the experimental Regolith COSMIC Wayland session
+ launcher. It runs Sway under COSMIC session management without depending on
+ GNOME session bootstrap packages.
+
 Package: regolith-session-common
 Architecture: any
 Depends: ${misc:Depends},

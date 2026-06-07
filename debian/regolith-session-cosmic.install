@@ -1,0 +1,4 @@
+usr/bin/regolith-session-cosmic-launch
+usr/lib/regolith/regolith-session-cosmic.sh
+usr/lib/regolith/regolith-session-cosmic-runtime
+usr/share/wayland-sessions/regolith-cosmic.desktop
