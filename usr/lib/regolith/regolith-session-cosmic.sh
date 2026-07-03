@@ -60,6 +60,7 @@ regolith_cosmic_runtime_mask_user_service() {
 regolith_cosmic_disable_legacy_helpers() {
     regolith_cosmic_runtime_mask_user_service regolith-init-inputd.service
     regolith_cosmic_runtime_mask_user_service regolith-init-displayd.service
+    regolith_cosmic_runtime_mask_user_service regolith-init-kanshi.service
 }
 
 regolith_cosmic_configure_status_bar() {

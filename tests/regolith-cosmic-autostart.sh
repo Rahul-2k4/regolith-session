@@ -237,6 +237,16 @@ if ! wait_for_log_entry 'systemctl argc=3 args=--user reset-failed regolith-init
     exit 1
 fi
 
+if ! wait_for_log_entry 'systemctl argc=5 args=--user mask --runtime --now regolith-init-kanshi.service'; then
+    echo "expected legacy kanshi helper to be runtime-masked for the COSMIC session" >&2
+    exit 1
+fi
+
+if ! wait_for_log_entry 'systemctl argc=3 args=--user reset-failed regolith-init-kanshi.service'; then
+    echo "expected failed legacy kanshi helper state to be reset" >&2
+    exit 1
+fi
+
 if ! wait_for_log_entry 'cosmolith argc=0 args='; then
     echo "expected cosmolith to autostart when a sway socket is available" >&2
     exit 1
