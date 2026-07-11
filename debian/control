@@ -54,8 +54,6 @@ Depends: ${misc:Depends},
     dbus,
     gnome-session-bin,
     gnome-settings-daemon,
-    regolith-displayd,
-    regolith-inputd,
     regolith-look-default,
     regolith-session-common,
     regolith-sway-root-config,
@@ -85,6 +83,8 @@ Architecture: any
 Depends: ${misc:Depends},
     cosmic-session,
     dbus,
+    regolith-displayd,
+    regolith-inputd,
     regolith-look-default,
     regolith-session-common,
     regolith-sway-root-config,
@@ -125,4 +125,3 @@ Depends: ${misc:Depends}
 Conflicts: gnome-session-flashback, regolith-session-flashback (<= 0.9.3)
 Description: Additional files for regolith X11 session
  This package contains the idle monitor autostart desktop file.
-

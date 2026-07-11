@@ -124,6 +124,12 @@ regolith_cosmic_start_optional_process_after() {
     nohup bash -c 'sleep "$1"; shift; exec "$@"' bash "$delay_seconds" "$program" "$@" >/dev/null 2>&1 &
 }
 
+regolith_cosmic_start_existing_daemon() {
+    # COSMIC owns these existing daemons directly. Their legacy user units
+    # remain masked because those units carry GNOME-session dependencies.
+    regolith_cosmic_start_optional_process "$@"
+}
+
 regolith_cosmic_wayland_socket_path() {
     local runtime_dir="${XDG_RUNTIME_DIR-}"
     local display_name="${WAYLAND_DISPLAY-}"
@@ -205,6 +211,9 @@ wait_for_regolith_cosmic_sway_socket() {
 
 start_regolith_cosmic_helpers() {
     regolith_cosmic_disable_legacy_helpers
+
+    regolith_cosmic_start_existing_daemon regolith-displayd
+    regolith_cosmic_start_existing_daemon regolith-inputd
 
     if regolith_cosmic_bool_is_true "${REGOLITH_COSMIC_ENABLE_COSMOLITH:-true}"; then
         if wait_for_regolith_cosmic_sway_socket; then
