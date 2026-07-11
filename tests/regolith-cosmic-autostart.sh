@@ -149,6 +149,25 @@ assert_sway_wait_sets_socket() {
     fi
 }
 
+assert_runtime_waits_for_sway_socket_before_helpers() {
+    local runtime_script="$ROOT_DIR/usr/lib/regolith/regolith-session-cosmic-runtime"
+    local sway_wait_line=
+    local helper_line=
+
+    sway_wait_line="$(grep -n 'if wait_for_regolith_cosmic_sway_socket' "$runtime_script" | cut -d: -f1)"
+    helper_line="$(grep -n 'start_regolith_cosmic_helpers' "$runtime_script" | cut -d: -f1)"
+
+    if [ -z "$sway_wait_line" ] || [ -z "$helper_line" ] || [ "$sway_wait_line" -ge "$helper_line" ]; then
+        echo "expected runtime to discover Sway IPC before starting COSMIC helpers" >&2
+        exit 1
+    fi
+
+    if ! grep -Fq 'Sway IPC socket was not found; skipping COSMIC helper startup' "$runtime_script"; then
+        echo "expected runtime to report and skip helper startup without a Sway IPC socket" >&2
+        exit 1
+    fi
+}
+
 wait_for_log_entry() {
     local entry="$1"
     local _=
@@ -179,6 +198,7 @@ assert_wayland_socket_fallback
 assert_wayland_wait_sets_display
 assert_sway_socket_fallback "$expected_sway_socket"
 assert_sway_wait_sets_socket "$expected_sway_socket"
+assert_runtime_waits_for_sway_socket_before_helpers
 SWAYSOCK="$(regolith_cosmic_sway_socket_path 2>/dev/null || true)"
 export SWAYSOCK
 
@@ -204,8 +224,15 @@ sleep 0.1
 regolith_cosmic_start_optional_process cosmic-settings-daemon
 sleep 0.1
 
-if [ "$(grep -c '^cosmic-settings-daemon argc=0 args=$' "$log_file" || true)" -ne 1 ]; then
+if ! wait_for_log_entry 'cosmic-settings-daemon argc=0 args='; then
     echo "expected long process names to be detected as already running" >&2
+    kill "$existing_pid" >/dev/null 2>&1 || true
+    wait "$existing_pid" 2>/dev/null || true
+    exit 1
+fi
+
+if [ "$(grep -c '^cosmic-settings-daemon argc=0 args=$' "$log_file")" -ne 1 ]; then
+    echo "expected long process names to be logged exactly once" >&2
     kill "$existing_pid" >/dev/null 2>&1 || true
     wait "$existing_pid" 2>/dev/null || true
     exit 1

@@ -10,7 +10,11 @@ source /usr/lib/regolith/regolith-session-cosmic.sh
 compositor_pid=$!
 
 if wait_for_regolith_cosmic_wayland_socket; then
-    start_regolith_cosmic_helpers
+    if wait_for_regolith_cosmic_sway_socket; then
+        start_regolith_cosmic_helpers
+    else
+        echo "regolith-session: Sway IPC socket was not found; skipping COSMIC helper startup" >&2
+    fi
 fi
 
 wait "$compositor_pid"
