@@ -48,6 +48,8 @@ if [ ! -e "$UPDATE_FLAG_DIR" ]; then
 fi
 
 export XDG_CURRENT_DESKTOP="Regolith-Wayland:COSMIC:sway"
+export XDG_SESSION_DESKTOP="cosmic"
+export DESKTOP_SESSION="cosmic"
 
 # Prevent GNOME-era Regolith bridge daemons from being pulled in by
 # regolith-wayland.target during this experimental COSMIC session.
@@ -62,4 +64,4 @@ if [[ "${unsupported_gpu,,}" == "true" ]]; then
 fi
 
 echo "Regolith is launching COSMIC session with Sway using $SWAY_CONFIG_FILE"
-exec cosmic-session "${sway_command[@]}"
+exec dbus-run-session -- /usr/bin/cosmic-session "${sway_command[@]}"
