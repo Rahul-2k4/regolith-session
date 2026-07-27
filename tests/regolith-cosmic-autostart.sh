@@ -36,6 +36,10 @@ make_stub() {
 #!/bin/bash
 printf '%s argc=%s args=%s\n' "$(basename "$0")" "$#" "$*" >>"$REGOLITH_COSMIC_TEST_LOG"
 
+if [ "$(basename "$0")" = "regolith-inputd" ]; then
+    printf '%s XDG_CURRENT_DESKTOP=%s\n' "$(basename "$0")" "${XDG_CURRENT_DESKTOP:-}" >>"$REGOLITH_COSMIC_TEST_LOG"
+fi
+
 if [ "${REGOLITH_COSMIC_TEST_HOLD:-}" = "$(basename "$0")" ]; then
     sleep 5
 fi
@@ -244,6 +248,7 @@ wait "$existing_pid" 2>/dev/null || true
 rm -f "$log_file"
 export REGOLITH_COSMIC_DISABLE_PROCESS_CHECK=true
 export REGOLITH_COSMIC_OSD_DELAY_SECONDS=0.1
+export XDG_CURRENT_DESKTOP='Regolith-Wayland:COSMIC:sway'
 start_regolith_cosmic_helpers
 
 if ! wait_for_log_entry 'systemctl argc=5 args=--user mask --runtime --now regolith-init-inputd.service'; then
@@ -273,6 +278,11 @@ fi
 
 if ! wait_for_log_entry 'regolith-inputd argc=0 args='; then
     echo "expected COSMIC-owned startup to launch regolith-inputd when available" >&2
+    exit 1
+fi
+
+if ! wait_for_log_entry 'regolith-inputd XDG_CURRENT_DESKTOP=Regolith-Wayland:COSMIC:sway'; then
+    echo "expected COSMIC-owned startup to pass the COSMIC desktop environment to regolith-inputd" >&2
     exit 1
 fi
 
