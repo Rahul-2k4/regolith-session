@@ -51,9 +51,6 @@ export XDG_CURRENT_DESKTOP="Regolith-Wayland:COSMIC:sway"
 export XDG_SESSION_DESKTOP="cosmic"
 export DESKTOP_SESSION="cosmic"
 
-# Prevent GNOME-era Regolith bridge daemons from being pulled in by
-# regolith-wayland.target during this experimental COSMIC session.
-regolith_cosmic_disable_legacy_helpers
 
 regolith_cosmic_configure_status_bar "$(trawlcat wm.bar.status_config /etc/regolith/i3status-rust/config.toml)"
 

@@ -9,6 +9,8 @@ This branch adds a separate `regolith-session-cosmic` package for the experiment
 - `usr/bin/regolith-session-cosmic-launch`
 - `usr/lib/regolith/regolith-session-cosmic.sh`
 - `usr/lib/regolith/regolith-session-cosmic-runtime`
+- `usr/lib/systemd/user/regolith-cosmic.target`
+- `usr/lib/systemd/user/regolith-gnome.target`
 - `usr/share/wayland-sessions/regolith-cosmic.desktop`
 - `debian/regolith-session-cosmic.install`
 
@@ -24,16 +26,23 @@ The launcher initializes Regolith trawl resources, sets `XDG_CURRENT_DESKTOP=Reg
 
 - COSMIC runtime owns `cosmic-settings-daemon` and delayed `cosmic-osd` startup.
 - `cosmolith` starts after the Sway IPC socket is available.
-- Legacy `regolith-init-inputd.service` and `regolith-init-displayd.service` are stopped/reset for this experimental session path.
-- `cosmic-idle` is opt-in with `REGOLITH_COSMIC_ENABLE_IDLE=true` until lock/idle validation is complete.
+- regolith-cosmic.target is installed WantedBy=cosmic-session.target and wants regolith-init-inputd.service and regolith-init-displayd.service.
+- regolith-gnome.target is installed WantedBy=gnome-session.target and wants inputd, displayd, and regolith-init-kanshi.service; kanshi remains GNOME-only.
+- The COSMIC launcher does not mask, stop, reset, or directly start the target-owned inputd/displayd/kanshi services.
+- cosmic-idle is opt-in with REGOLITH_COSMIC_ENABLE_IDLE=true until lock/idle validation is complete.
 
 ## Validation
+
+Runtime proof for the target-owned COSMIC helper startup is still pending.
 
 Run:
 
 ```bash
 bash tests/regolith-cosmic-autostart.sh
 bash tests/regolith-cosmic-status-bar.sh
+bash tests/regolith-systemd-targets.sh
+# In regolith-inputd: bash tests/regolith-systemd-inputd.sh
+# In regolith-displayd: bash tests/regolith-systemd-displayd.sh
 dpkg-source --before-build .
 dpkg-buildpackage -us -uc -b
 ```
