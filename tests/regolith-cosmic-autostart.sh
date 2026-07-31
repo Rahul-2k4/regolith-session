@@ -301,6 +301,11 @@ printf 'systemctl argc=%s args=%s\n' "$#" "$*" >>"$REGOLITH_COSMIC_TEST_LOG"
 if [ "${REGOLITH_COSMIC_TEST_SYSTEMCTL_START_FAIL:-false}" = true ] && [ "$2" = start ]; then
     exit 1
 fi
+
+if [ "${REGOLITH_COSMIC_TEST_EXIT_AFTER_TARGET_START:-false}" = true ] && [ "$2" = start ]; then
+    : >"$REGOLITH_COSMIC_TEST_EXIT_AFTER_TARGET_START"
+    sleep 0.1
+fi
 EOF
 chmod +x "$stub_dir/systemctl"
 
@@ -367,9 +372,14 @@ assert_runtime_skips_target_before_readiness() {
         echo "expected runtime not to start cosmic-session.target before compositor readiness" >&2
         exit 1
     fi
+
+    if grep -Fq 'args=--user stop cosmic-session.target' "$log_file" 2>/dev/null; then
+        echo "expected runtime not to stop an unowned target before compositor readiness" >&2
+        exit 1
+    fi
 }
 
-assert_runtime_cleans_up_failed_target_start() {
+assert_runtime_does_not_stop_failed_target_start() {
     rm -f "$log_file"
 
     export REGOLITH_COSMIC_TEST_SYSTEMCTL_START_FAIL=true
@@ -389,8 +399,8 @@ assert_runtime_cleans_up_failed_target_start() {
         exit 1
     fi
 
-    if [ "$(grep -c '^systemctl argc=3 args=--user stop cosmic-session.target$' "$log_file")" -ne 1 ]; then
-        echo "expected failed target start to still run target cleanup" >&2
+    if grep -Fq 'args=--user stop cosmic-session.target' "$log_file" 2>/dev/null; then
+        echo "expected failed target start not to stop an unowned target" >&2
         exit 1
     fi
 
@@ -400,7 +410,41 @@ assert_runtime_cleans_up_failed_target_start() {
     fi
 }
 
+assert_runtime_cleans_up_target_after_post_start_compositor_exit() {
+    local exit_marker="$workdir/post-start-exit"
+
+    rm -f "$log_file" "$exit_marker"
+
+    export REGOLITH_COSMIC_TEST_EXIT_AFTER_TARGET_START="$exit_marker"
+    set +e
+    run_runtime true bash -c 'while [ ! -e "$REGOLITH_COSMIC_TEST_EXIT_AFTER_TARGET_START" ]; do sleep 0.01; done; exit 31'
+    runtime_status=$?
+    set -e
+    unset REGOLITH_COSMIC_TEST_EXIT_AFTER_TARGET_START
+
+    if [ "$runtime_status" -ne 31 ]; then
+        echo "expected post-start compositor failure status to be preserved, got $runtime_status" >&2
+        exit 1
+    fi
+
+    if [ "$(grep -c '^systemctl argc=3 args=--user start cosmic-session.target$' "$log_file")" -ne 1 ]; then
+        echo "expected target start before post-start compositor liveness check" >&2
+        exit 1
+    fi
+
+    if [ "$(grep -c '^systemctl argc=3 args=--user stop cosmic-session.target$' "$log_file")" -ne 1 ]; then
+        echo "expected target cleanup after post-start compositor exit" >&2
+        exit 1
+    fi
+
+    if grep -qx helpers "$log_file"; then
+        echo "expected helper startup to be skipped after post-start compositor exit" >&2
+        exit 1
+    fi
+}
+
 assert_runtime_uses_installed_helper
 assert_runtime_target_lifecycle
 assert_runtime_skips_target_before_readiness
-assert_runtime_cleans_up_failed_target_start
+assert_runtime_does_not_stop_failed_target_start
+assert_runtime_cleans_up_target_after_post_start_compositor_exit

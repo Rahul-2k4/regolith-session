@@ -8,12 +8,21 @@ source /usr/lib/regolith/regolith-session-cosmic.sh
 
 "$@" &
 compositor_pid=$!
+target_started=false
 
 if wait_for_regolith_cosmic_wayland_socket; then
     if wait_for_regolith_cosmic_sway_socket; then
         if kill -0 "$compositor_pid" >/dev/null 2>&1; then
             if systemctl --user start cosmic-session.target; then
-                start_regolith_cosmic_helpers
+                target_started=true
+
+                if kill -0 "$compositor_pid" >/dev/null 2>&1; then
+                    start_regolith_cosmic_helpers
+                else
+                    echo "regolith-session: compositor exited after COSMIC target startup; stopping target and skipping helpers" >&2
+                    systemctl --user stop cosmic-session.target || true
+                    target_started=false
+                fi
             else
                 echo "regolith-session: failed to start cosmic-session.target; skipping COSMIC helper startup" >&2
             fi
@@ -30,6 +39,8 @@ wait "$compositor_pid"
 compositor_status=$?
 set -e
 
-systemctl --user stop cosmic-session.target || true
+if [ "$target_started" = true ]; then
+    systemctl --user stop cosmic-session.target || true
+fi
 
 exit "$compositor_status"
