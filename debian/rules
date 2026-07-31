@@ -3,3 +3,6 @@
 %:
 	dh $@
 
+override_dh_auto_test:
+	bash tests/regolith-systemd-targets.sh
+	dh_auto_test
