@@ -9,13 +9,23 @@ source /usr/lib/regolith/regolith-session-cosmic.sh
 "$@" &
 compositor_pid=$!
 target_started=false
+legacy_targets_masked=false
+
+mask_regolith_legacy_targets_for_cosmic() {
+    if systemctl --user mask --runtime regolith-gnome.target regolith-wayland.target; then
+        legacy_targets_masked=true
+        systemctl --user stop regolith-gnome.target || true
+        systemctl --user stop regolith-wayland.target || true
+    else
+        echo "regolith-session: failed to mask legacy Regolith targets; skipping legacy target stop" >&2
+    fi
+}
 
 if wait_for_regolith_cosmic_wayland_socket; then
     if wait_for_regolith_cosmic_sway_socket; then
         if kill -0 "$compositor_pid" >/dev/null 2>&1; then
             if systemctl --user is-active --quiet cosmic-session.target; then
-                systemctl --user stop regolith-gnome.target || true
-                systemctl --user stop regolith-wayland.target || true
+                mask_regolith_legacy_targets_for_cosmic
                 start_regolith_cosmic_helpers
             else
                 target_state_status=$?
@@ -24,8 +34,7 @@ if wait_for_regolith_cosmic_wayland_socket; then
                     target_started=true
 
                     if kill -0 "$compositor_pid" >/dev/null 2>&1; then
-                        systemctl --user stop regolith-gnome.target || true
-                        systemctl --user stop regolith-wayland.target || true
+                        mask_regolith_legacy_targets_for_cosmic
                         start_regolith_cosmic_helpers
                     else
                         echo "regolith-session: compositor exited after COSMIC target startup; stopping target and skipping helpers" >&2
@@ -55,6 +64,10 @@ set -e
 
 if [ "$target_started" = true ]; then
     systemctl --user stop cosmic-session.target || true
+fi
+
+if [ "$legacy_targets_masked" = true ]; then
+    systemctl --user unmask regolith-gnome.target regolith-wayland.target || true
 fi
 
 exit "$compositor_status"
