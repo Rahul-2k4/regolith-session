@@ -152,7 +152,7 @@ assert_runtime_waits_for_sway_socket_before_helpers() {
     local helper_line=
 
     sway_wait_line="$(grep -n 'if wait_for_regolith_cosmic_sway_socket' "$runtime_script" | cut -d: -f1)"
-    helper_line="$(grep -n 'start_regolith_cosmic_helpers' "$runtime_script" | cut -d: -f1)"
+    helper_line="$(grep -n '^[[:space:]]*start_regolith_cosmic_helpers$' "$runtime_script" | head -n1 | cut -d: -f1)"
 
     if [ -z "$sway_wait_line" ] || [ -z "$helper_line" ] || [ "$sway_wait_line" -ge "$helper_line" ]; then
         echo "expected runtime to discover Sway IPC before starting COSMIC helpers" >&2
@@ -298,11 +298,19 @@ cat >"$stub_dir/systemctl" <<'EOF'
 #!/bin/bash
 printf 'systemctl argc=%s args=%s\n' "$#" "$*" >>"$REGOLITH_COSMIC_TEST_LOG"
 
+if [ "$2" = is-active ]; then
+    if [ "${REGOLITH_COSMIC_TEST_SYSTEMCTL_PREACTIVE:-false}" = true ]; then
+        exit 0
+    fi
+
+    exit "${REGOLITH_COSMIC_TEST_SYSTEMCTL_STATE_STATUS:-3}"
+fi
+
 if [ "${REGOLITH_COSMIC_TEST_SYSTEMCTL_START_FAIL:-false}" = true ] && [ "$2" = start ]; then
     exit 1
 fi
 
-if [ "${REGOLITH_COSMIC_TEST_EXIT_AFTER_TARGET_START:-false}" = true ] && [ "$2" = start ]; then
+if [ -n "${REGOLITH_COSMIC_TEST_EXIT_AFTER_TARGET_START:-}" ] && [ "$2" = start ]; then
     : >"$REGOLITH_COSMIC_TEST_EXIT_AFTER_TARGET_START"
     sleep 0.1
 fi
@@ -315,6 +323,9 @@ run_runtime() {
 
     REGOLITH_COSMIC_TEST_READY="$ready" \
         REGOLITH_COSMIC_TEST_SYSTEMCTL_START_FAIL="${REGOLITH_COSMIC_TEST_SYSTEMCTL_START_FAIL:-false}" \
+        REGOLITH_COSMIC_TEST_SYSTEMCTL_PREACTIVE="${REGOLITH_COSMIC_TEST_SYSTEMCTL_PREACTIVE:-false}" \
+        REGOLITH_COSMIC_TEST_SYSTEMCTL_STATE_STATUS="${REGOLITH_COSMIC_TEST_SYSTEMCTL_STATE_STATUS:-3}" \
+        REGOLITH_COSMIC_TEST_EXIT_AFTER_TARGET_START="${REGOLITH_COSMIC_TEST_EXIT_AFTER_TARGET_START:-}" \
         "$runtime_script" "$@"
 }
 
@@ -339,6 +350,11 @@ assert_runtime_target_lifecycle() {
         exit 1
     fi
 
+    if [ "$(grep -c '^systemctl argc=4 args=--user is-active --quiet cosmic-session.target$' "$log_file")" -ne 1 ]; then
+        echo "expected runtime to query cosmic-session.target before readiness cleanup" >&2
+        exit 1
+    fi
+
     if [ "$(grep -c '^systemctl argc=3 args=--user start cosmic-session.target$' "$log_file")" -ne 1 ]; then
         echo "expected runtime to start cosmic-session.target exactly once after readiness" >&2
         exit 1
@@ -351,6 +367,42 @@ assert_runtime_target_lifecycle() {
 
     if ! grep -qx helpers "$log_file"; then
         echo "expected runtime to preserve COSMIC optional helper startup" >&2
+        exit 1
+    fi
+}
+
+assert_runtime_does_not_stop_preactive_target() {
+    rm -f "$log_file"
+
+    export REGOLITH_COSMIC_TEST_SYSTEMCTL_PREACTIVE=true
+    set +e
+    run_runtime true bash -c 'sleep 0.1; exit 37'
+    runtime_status=$?
+    set -e
+    unset REGOLITH_COSMIC_TEST_SYSTEMCTL_PREACTIVE
+
+    if [ "$runtime_status" -ne 37 ]; then
+        echo "expected pre-active target path to preserve compositor exit status, got $runtime_status" >&2
+        exit 1
+    fi
+
+    if [ "$(grep -c '^systemctl argc=4 args=--user is-active --quiet cosmic-session.target$' "$log_file")" -ne 1 ]; then
+        echo "expected runtime to query the pre-active COSMIC target" >&2
+        exit 1
+    fi
+
+    if grep -Fq 'args=--user start cosmic-session.target' "$log_file" 2>/dev/null; then
+        echo "expected runtime not to start an already active COSMIC target" >&2
+        exit 1
+    fi
+
+    if grep -Fq 'args=--user stop cosmic-session.target' "$log_file" 2>/dev/null; then
+        echo "expected runtime not to stop a pre-active COSMIC target" >&2
+        exit 1
+    fi
+
+    if ! grep -qx helpers "$log_file"; then
+        echo "expected pre-active COSMIC target to preserve helper startup" >&2
         exit 1
     fi
 }
@@ -445,6 +497,7 @@ assert_runtime_cleans_up_target_after_post_start_compositor_exit() {
 
 assert_runtime_uses_installed_helper
 assert_runtime_target_lifecycle
+assert_runtime_does_not_stop_preactive_target
 assert_runtime_skips_target_before_readiness
 assert_runtime_does_not_stop_failed_target_start
 assert_runtime_cleans_up_target_after_post_start_compositor_exit
