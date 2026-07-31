@@ -9,24 +9,77 @@ source /usr/lib/regolith/regolith-session-cosmic.sh
 "$@" &
 compositor_pid=$!
 target_started=false
-legacy_targets_masked=false
+legacy_gnome_target_mask_owned=false
+legacy_wayland_target_mask_owned=false
+
+regolith_legacy_target_is_pre_masked() {
+    local target="$1"
+    local state=
+
+    state="$(systemctl --user is-enabled "$target" 2>/dev/null || true)"
+
+    case "$state" in
+        masked|masked-runtime)
+            return 0
+            ;;
+        enabled|enabled-runtime|linked|linked-runtime|disabled|static|indirect|generated|transient|alias)
+            return 1
+            ;;
+    esac
+
+    echo "regolith-session: failed to establish mask state for $target; skipping COSMIC helper startup" >&2
+    return 2
+}
 
 mask_regolith_legacy_targets_for_cosmic() {
-    if systemctl --user mask --runtime regolith-gnome.target regolith-wayland.target; then
-        legacy_targets_masked=true
-        systemctl --user stop regolith-gnome.target || true
-        systemctl --user stop regolith-wayland.target || true
+    local gnome_target_pre_masked=false
+    local wayland_target_pre_masked=false
+    local mask_state_status=0
+
+    if regolith_legacy_target_is_pre_masked regolith-gnome.target; then
+        gnome_target_pre_masked=true
     else
-        echo "regolith-session: failed to mask legacy Regolith targets; skipping legacy target stop" >&2
+        mask_state_status=$?
+        if [ "$mask_state_status" -ne 1 ]; then
+            return 1
+        fi
     fi
+
+    if regolith_legacy_target_is_pre_masked regolith-wayland.target; then
+        wayland_target_pre_masked=true
+    else
+        mask_state_status=$?
+        if [ "$mask_state_status" -ne 1 ]; then
+            return 1
+        fi
+    fi
+
+    if ! systemctl --user mask --runtime regolith-gnome.target regolith-wayland.target; then
+        echo "regolith-session: failed to mask legacy Regolith targets; skipping COSMIC helper startup" >&2
+        return 1
+    fi
+
+    if [ "$gnome_target_pre_masked" != true ]; then
+        legacy_gnome_target_mask_owned=true
+    fi
+
+    if [ "$wayland_target_pre_masked" != true ]; then
+        legacy_wayland_target_mask_owned=true
+    fi
+
+    systemctl --user stop regolith-gnome.target || true
+    systemctl --user stop regolith-wayland.target || true
 }
 
 if wait_for_regolith_cosmic_wayland_socket; then
     if wait_for_regolith_cosmic_sway_socket; then
         if kill -0 "$compositor_pid" >/dev/null 2>&1; then
             if systemctl --user is-active --quiet cosmic-session.target; then
-                mask_regolith_legacy_targets_for_cosmic
-                start_regolith_cosmic_helpers
+                if mask_regolith_legacy_targets_for_cosmic; then
+                    start_regolith_cosmic_helpers
+                else
+                    echo "regolith-session: failed to isolate legacy Regolith targets; skipping COSMIC helper startup" >&2
+                fi
             else
                 target_state_status=$?
 
@@ -34,8 +87,11 @@ if wait_for_regolith_cosmic_wayland_socket; then
                     target_started=true
 
                     if kill -0 "$compositor_pid" >/dev/null 2>&1; then
-                        mask_regolith_legacy_targets_for_cosmic
-                        start_regolith_cosmic_helpers
+                        if mask_regolith_legacy_targets_for_cosmic; then
+                            start_regolith_cosmic_helpers
+                        else
+                            echo "regolith-session: failed to isolate legacy Regolith targets; skipping COSMIC helper startup" >&2
+                        fi
                     else
                         echo "regolith-session: compositor exited after COSMIC target startup; stopping target and skipping helpers" >&2
                         systemctl --user stop cosmic-session.target || true
@@ -66,8 +122,12 @@ if [ "$target_started" = true ]; then
     systemctl --user stop cosmic-session.target || true
 fi
 
-if [ "$legacy_targets_masked" = true ]; then
-    systemctl --user unmask regolith-gnome.target regolith-wayland.target || true
+if [ "$legacy_gnome_target_mask_owned" = true ]; then
+    systemctl --user unmask regolith-gnome.target || true
+fi
+
+if [ "$legacy_wayland_target_mask_owned" = true ]; then
+    systemctl --user unmask regolith-wayland.target || true
 fi
 
 exit "$compositor_status"
