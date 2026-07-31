@@ -444,6 +444,12 @@ assert_runtime_skips_target_before_readiness() {
         echo "expected runtime not to stop an unowned target before compositor readiness" >&2
         exit 1
     fi
+    if grep -Fq 'args=--user stop regolith-gnome.target' "$log_file" 2>/dev/null ||
+        grep -Fq 'args=--user stop regolith-wayland.target' "$log_file" 2>/dev/null; then
+        echo "expected early compositor exit not to stop legacy Regolith targets" >&2
+        exit 1
+    fi
+
 }
 
 assert_runtime_does_not_stop_failed_target_start() {
@@ -516,3 +522,78 @@ assert_runtime_does_not_stop_preactive_target
 assert_runtime_skips_target_before_readiness
 assert_runtime_does_not_stop_failed_target_start
 assert_runtime_cleans_up_target_after_post_start_compositor_exit
+
+assert_legacy_targets_stopped_once() {
+    if [ "$(grep -c '^systemctl argc=3 args=--user stop regolith-gnome.target$' "$log_file")" -ne 1 ] ||
+        [ "$(grep -c '^systemctl argc=3 args=--user stop regolith-wayland.target$' "$log_file")" -ne 1 ]; then
+        echo "expected COSMIC availability to stop each legacy Regolith target once" >&2
+        exit 1
+    fi
+}
+
+assert_legacy_targets_not_stopped() {
+    if grep -Fq 'args=--user stop regolith-gnome.target' "$log_file" 2>/dev/null ||
+        grep -Fq 'args=--user stop regolith-wayland.target' "$log_file" 2>/dev/null; then
+        echo "expected COSMIC failure path not to stop legacy Regolith targets" >&2
+        exit 1
+    fi
+}
+
+assert_runtime_stops_legacy_targets_after_cosmic_availability() {
+    rm -f "$log_file"
+    set +e
+    run_runtime true bash -c 'sleep 0.1; exit 43'
+    runtime_status=$?
+    set -e
+    [ "$runtime_status" -eq 43 ] || exit 1
+    assert_legacy_targets_stopped_once
+
+    rm -f "$log_file"
+    export REGOLITH_COSMIC_TEST_SYSTEMCTL_PREACTIVE=true
+    set +e
+    run_runtime true bash -c 'sleep 0.1; exit 47'
+    runtime_status=$?
+    set -e
+    unset REGOLITH_COSMIC_TEST_SYSTEMCTL_PREACTIVE
+    [ "$runtime_status" -eq 47 ] || exit 1
+    assert_legacy_targets_stopped_once
+}
+
+assert_runtime_keeps_legacy_targets_on_target_state_query_error() {
+    rm -f "$log_file"
+    export REGOLITH_COSMIC_TEST_SYSTEMCTL_STATE_STATUS=1
+    set +e
+    run_runtime true bash -c 'sleep 0.1; exit 41'
+    runtime_status=$?
+    set -e
+    unset REGOLITH_COSMIC_TEST_SYSTEMCTL_STATE_STATUS
+    [ "$runtime_status" -eq 41 ] || exit 1
+    assert_legacy_targets_not_stopped
+}
+
+assert_runtime_keeps_legacy_targets_on_target_start_failure() {
+    rm -f "$log_file"
+    export REGOLITH_COSMIC_TEST_SYSTEMCTL_START_FAIL=true
+    set +e
+    run_runtime true bash -c 'sleep 0.1; exit 29'
+    runtime_status=$?
+    set -e
+    unset REGOLITH_COSMIC_TEST_SYSTEMCTL_START_FAIL
+    [ "$runtime_status" -eq 29 ] || exit 1
+    assert_legacy_targets_not_stopped
+}
+
+assert_runtime_keeps_legacy_targets_on_early_compositor_exit() {
+    rm -f "$log_file"
+    set +e
+    run_runtime false bash -c 'exit 17'
+    runtime_status=$?
+    set -e
+    [ "$runtime_status" -eq 17 ] || exit 1
+    assert_legacy_targets_not_stopped
+}
+
+assert_runtime_stops_legacy_targets_after_cosmic_availability
+assert_runtime_keeps_legacy_targets_on_target_state_query_error
+assert_runtime_keeps_legacy_targets_on_target_start_failure
+assert_runtime_keeps_legacy_targets_on_early_compositor_exit
