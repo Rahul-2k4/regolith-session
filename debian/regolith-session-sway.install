@@ -1,6 +1,6 @@
 usr/bin/regolith-session-wayland
 usr/share/gnome-session/sessions/regolith-wayland.session
-usr/share/wayland-sessions
+usr/share/wayland-sessions/regolith-wayland.desktop
 usr/share/applications/regolith-wayland.desktop
 usr/bin/regolith-session-wayland-launch
 usr/lib/systemd/user/regolith-wayland.service

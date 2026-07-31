@@ -33,6 +33,9 @@ has_line "$ROOT_DIR/debian/regolith-session-sway.install" "usr/lib/systemd/user/
 has_line "$ROOT_DIR/debian/regolith-session-sway.install" "usr/lib/systemd/user/gnome-session.target.d" || fail "GNOME parent drop-in is not packaged"
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/user/regolith-cosmic.target" || fail "COSMIC target is not packaged"
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/user/cosmic-session.target.d" || fail "COSMIC parent drop-in is not packaged"
+has_line "$ROOT_DIR/debian/regolith-session-sway.install" "usr/share/wayland-sessions/regolith-wayland.desktop" || fail "Sway Wayland desktop entry is not packaged explicitly"
+if grep -Fqx "usr/share/wayland-sessions" "$ROOT_DIR/debian/regolith-session-sway.install"; then fail "Sway package uses a broad Wayland desktop entry wildcard"; fi
+if comm -12 <(sed -n "s#^usr/share/wayland-sessions/##p" "$ROOT_DIR/debian/regolith-session-sway.install" | sort) <(sed -n "s#^usr/share/wayland-sessions/##p" "$ROOT_DIR/debian/regolith-session-cosmic.install" | sort) | grep -q .; then fail "Sway and COSMIC packages own the same Wayland desktop entry"; fi
 for source in "$ROOT_DIR/usr/bin/regolith-session-cosmic-launch" "$ROOT_DIR/usr/lib/regolith/regolith-session-cosmic.sh"; do
     [ -f "$source" ] || fail "missing COSMIC launcher source: $source"
     if grep -Fq "regolith-init-inputd.service" "$source"; then fail "COSMIC launcher still masks inputd"; fi
