@@ -54,13 +54,22 @@ mask_regolith_legacy_targets_for_cosmic() {
         fi
     fi
 
-    if ! systemctl --user mask --runtime regolith-gnome.target regolith-wayland.target; then
+    if ! systemctl --user mask --runtime regolith-gnome.target; then
         echo "regolith-session: failed to mask legacy Regolith targets; skipping COSMIC helper startup" >&2
         return 1
     fi
 
     if [ "$gnome_target_pre_masked" != true ]; then
         legacy_gnome_target_mask_owned=true
+    fi
+
+    if ! systemctl --user mask --runtime regolith-wayland.target; then
+        echo "regolith-session: failed to mask legacy Regolith targets; skipping COSMIC helper startup" >&2
+        if [ "$legacy_gnome_target_mask_owned" = true ]; then
+            systemctl --user unmask regolith-gnome.target || true
+            legacy_gnome_target_mask_owned=false
+        fi
+        return 1
     fi
 
     if [ "$wayland_target_pre_masked" != true ]; then

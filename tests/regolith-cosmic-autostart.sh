@@ -340,7 +340,8 @@ if [ "${REGOLITH_COSMIC_TEST_SYSTEMCTL_START_FAIL:-false}" = true ] && [ "$2" = 
     exit 1
 fi
 
-if [ "${REGOLITH_COSMIC_TEST_SYSTEMCTL_MASK_FAIL:-false}" = true ] && [ "$2" = mask ]; then
+if [ "$2" = mask ] && { [ "${REGOLITH_COSMIC_TEST_SYSTEMCTL_MASK_FAIL:-false}" = true ] ||
+    [ "${REGOLITH_COSMIC_TEST_SYSTEMCTL_MASK_FAIL_TARGET:-}" = "$4" ]; }; then
     exit 1
 fi
 
@@ -360,6 +361,7 @@ run_runtime() {
         REGOLITH_COSMIC_TEST_SYSTEMCTL_PREACTIVE="${REGOLITH_COSMIC_TEST_SYSTEMCTL_PREACTIVE:-false}" \
         REGOLITH_COSMIC_TEST_SYSTEMCTL_STATE_STATUS="${REGOLITH_COSMIC_TEST_SYSTEMCTL_STATE_STATUS:-3}" \
         REGOLITH_COSMIC_TEST_SYSTEMCTL_MASK_FAIL="${REGOLITH_COSMIC_TEST_SYSTEMCTL_MASK_FAIL:-false}" \
+        REGOLITH_COSMIC_TEST_SYSTEMCTL_MASK_FAIL_TARGET="${REGOLITH_COSMIC_TEST_SYSTEMCTL_MASK_FAIL_TARGET:-}" \
         REGOLITH_COSMIC_TEST_SYSTEMCTL_IS_ENABLED_FAIL="${REGOLITH_COSMIC_TEST_SYSTEMCTL_IS_ENABLED_FAIL:-}" \
         REGOLITH_COSMIC_TEST_GNOME_TARGET_ENABLED_STATE="${REGOLITH_COSMIC_TEST_GNOME_TARGET_ENABLED_STATE:-disabled}" \
         REGOLITH_COSMIC_TEST_WAYLAND_TARGET_ENABLED_STATE="${REGOLITH_COSMIC_TEST_WAYLAND_TARGET_ENABLED_STATE:-disabled}" \
@@ -386,12 +388,18 @@ assert_legacy_target_mask_queries_once() {
         exit 1
     fi
 }
+assert_legacy_target_masked_once() {
+    local target="$1"
 
-assert_legacy_targets_masked_once() {
-    if [ "$(grep -c "^systemctl argc=5 args=--user mask --runtime regolith-gnome.target regolith-wayland.target$" "$log_file")" -ne 1 ]; then
-        echo "expected COSMIC runtime to runtime-mask legacy Regolith targets exactly once" >&2
+    if [ "$(grep -c "^systemctl argc=4 args=--user mask --runtime $target$" "$log_file")" -ne 1 ]; then
+        echo "expected COSMIC runtime to runtime-mask $target exactly once" >&2
         exit 1
     fi
+}
+
+assert_legacy_targets_masked_once() {
+    assert_legacy_target_masked_once regolith-gnome.target
+    assert_legacy_target_masked_once regolith-wayland.target
 }
 
 assert_legacy_target_unmasked_once() {
@@ -411,6 +419,15 @@ assert_legacy_target_not_unmasked() {
         exit 1
     fi
 }
+assert_legacy_target_not_masked() {
+    local target="$1"
+
+    if grep -Fq "args=--user mask --runtime $target" "$log_file" 2>/dev/null; then
+        echo "expected COSMIC runtime not to runtime-mask $target" >&2
+        exit 1
+    fi
+}
+
 
 assert_legacy_targets_unmasked_once() {
     assert_legacy_target_unmasked_once regolith-gnome.target
@@ -423,7 +440,8 @@ assert_legacy_targets_not_unmasked() {
 }
 
 assert_legacy_targets_not_masked() {
-    if grep -Fq "args=--user mask --runtime regolith-gnome.target regolith-wayland.target" "$log_file" 2>/dev/null ||
+    if grep -Fq "args=--user mask --runtime regolith-gnome.target" "$log_file" 2>/dev/null ||
+        grep -Fq "args=--user mask --runtime regolith-wayland.target" "$log_file" 2>/dev/null ||
         grep -Fq "args=--user unmask regolith-gnome.target" "$log_file" 2>/dev/null ||
         grep -Fq "args=--user unmask regolith-wayland.target" "$log_file" 2>/dev/null; then
         echo "expected COSMIC failure path not to mask or unmask legacy Regolith targets" >&2
@@ -612,7 +630,7 @@ assert_runtime_does_not_stop_failed_target_start() {
     fi
 }
 
-assert_runtime_skips_helpers_when_legacy_mask_fails() {
+assert_runtime_skips_helpers_when_first_legacy_mask_fails() {
     rm -f "$log_file"
 
     export REGOLITH_COSMIC_TEST_SYSTEMCTL_MASK_FAIL=true
@@ -626,15 +644,42 @@ assert_runtime_skips_helpers_when_legacy_mask_fails() {
         echo "expected mask-failure path to preserve compositor exit status, got $runtime_status" >&2
         exit 1
     fi
-
-    assert_legacy_target_mask_queries_once
-    assert_legacy_targets_masked_once
+    assert_legacy_target_masked_once regolith-gnome.target
+    assert_legacy_target_not_masked regolith-wayland.target
     assert_legacy_targets_not_unmasked
     assert_helpers_not_started
     assert_legacy_targets_not_stopped
 
     if [ "$(grep -c '^systemctl argc=3 args=--user stop cosmic-session.target$' "$log_file")" -ne 1 ]; then
         echo "expected owned COSMIC target cleanup after legacy mask failure" >&2
+        exit 1
+    fi
+}
+
+assert_runtime_rolls_back_first_legacy_mask_when_second_fails() {
+    rm -f "$log_file"
+
+    export REGOLITH_COSMIC_TEST_SYSTEMCTL_MASK_FAIL_TARGET=regolith-wayland.target
+    set +e
+    run_runtime true bash -c 'sleep 0.1; exit 71'
+    runtime_status=$?
+    set -e
+    unset REGOLITH_COSMIC_TEST_SYSTEMCTL_MASK_FAIL_TARGET
+
+    if [ "$runtime_status" -ne 71 ]; then
+        echo "expected second-mask failure path to preserve compositor exit status, got $runtime_status" >&2
+        exit 1
+    fi
+
+    assert_legacy_target_mask_queries_once
+    assert_legacy_targets_masked_once
+    assert_legacy_target_unmasked_once regolith-gnome.target
+    assert_legacy_target_not_unmasked regolith-wayland.target
+    assert_helpers_not_started
+    assert_legacy_targets_not_stopped
+
+    if [ "$(grep -c '^systemctl argc=3 args=--user stop cosmic-session.target$' "$log_file")" -ne 1 ]; then
+        echo "expected owned COSMIC target cleanup after second legacy mask failure" >&2
         exit 1
     fi
 }
@@ -700,7 +745,8 @@ assert_runtime_target_lifecycle
 assert_runtime_does_not_stop_preactive_target
 assert_runtime_skips_target_before_readiness
 assert_runtime_does_not_stop_failed_target_start
-assert_runtime_skips_helpers_when_legacy_mask_fails
+assert_runtime_skips_helpers_when_first_legacy_mask_fails
+assert_runtime_rolls_back_first_legacy_mask_when_second_fails
 assert_runtime_skips_helpers_when_legacy_mask_state_query_fails
 assert_runtime_cleans_up_target_after_post_start_compositor_exit
 
