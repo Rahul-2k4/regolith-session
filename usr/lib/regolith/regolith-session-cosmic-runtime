@@ -13,6 +13,9 @@ target_started=false
 if wait_for_regolith_cosmic_wayland_socket; then
     if wait_for_regolith_cosmic_sway_socket; then
         if kill -0 "$compositor_pid" >/dev/null 2>&1; then
+            systemctl --user stop regolith-gnome.target || true
+            systemctl --user stop regolith-wayland.target || true
+
             if systemctl --user is-active --quiet cosmic-session.target; then
                 start_regolith_cosmic_helpers
             else

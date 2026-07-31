@@ -355,6 +355,21 @@ assert_runtime_target_lifecycle() {
         exit 1
     fi
 
+    if [ "$(grep -c '^systemctl argc=3 args=--user stop regolith-gnome.target$' "$log_file")" -ne 1 ]; then
+        echo "expected COSMIC runtime to stop the GNOME Regolith target exactly once" >&2
+        exit 1
+    fi
+
+    if [ "$(grep -c '^systemctl argc=3 args=--user stop regolith-wayland.target$' "$log_file")" -ne 1 ]; then
+        echo "expected COSMIC runtime to stop the Wayland Regolith target exactly once" >&2
+        exit 1
+    fi
+
+    if grep -Fq 'args=--user stop gnome-session.target' "$log_file" 2>/dev/null; then
+        echo "expected COSMIC runtime not to stop generic gnome-session.target" >&2
+        exit 1
+    fi
+
     if [ "$(grep -c '^systemctl argc=3 args=--user start cosmic-session.target$' "$log_file")" -ne 1 ]; then
         echo "expected runtime to start cosmic-session.target exactly once after readiness" >&2
         exit 1
