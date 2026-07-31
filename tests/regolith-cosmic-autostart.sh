@@ -271,3 +271,136 @@ if ! wait_for_log_entry 'cosmic-idle argc=0 args='; then
     echo "expected cosmic-idle to autostart when enabled explicitly" >&2
     exit 1
 fi
+
+runtime_helper_script="$workdir/runtime-helper.sh"
+cat >"$runtime_helper_script" <<'EOF'
+#!/bin/bash
+wait_for_regolith_cosmic_wayland_socket() {
+    [ "${REGOLITH_COSMIC_TEST_READY:-false}" = true ]
+}
+
+wait_for_regolith_cosmic_sway_socket() {
+    [ "${REGOLITH_COSMIC_TEST_READY:-false}" = true ]
+}
+
+start_regolith_cosmic_helpers() {
+    printf '%s\n' helpers >>"$REGOLITH_COSMIC_TEST_LOG"
+}
+EOF
+chmod +x "$runtime_helper_script"
+
+runtime_script="$workdir/regolith-session-cosmic-runtime"
+sed "s|source /usr/lib/regolith/regolith-session-cosmic.sh|source \"$runtime_helper_script\"|" \
+    "$ROOT_DIR/usr/lib/regolith/regolith-session-cosmic-runtime" >"$runtime_script"
+chmod +x "$runtime_script"
+
+cat >"$stub_dir/systemctl" <<'EOF'
+#!/bin/bash
+printf 'systemctl argc=%s args=%s\n' "$#" "$*" >>"$REGOLITH_COSMIC_TEST_LOG"
+
+if [ "${REGOLITH_COSMIC_TEST_SYSTEMCTL_START_FAIL:-false}" = true ] && [ "$2" = start ]; then
+    exit 1
+fi
+EOF
+chmod +x "$stub_dir/systemctl"
+
+run_runtime() {
+    local ready="$1"
+    shift
+
+    REGOLITH_COSMIC_TEST_READY="$ready" \
+        REGOLITH_COSMIC_TEST_SYSTEMCTL_START_FAIL="${REGOLITH_COSMIC_TEST_SYSTEMCTL_START_FAIL:-false}" \
+        "$runtime_script" "$@"
+}
+
+assert_runtime_uses_installed_helper() {
+    if ! grep -Fqx 'source /usr/lib/regolith/regolith-session-cosmic.sh' \
+        "$ROOT_DIR/usr/lib/regolith/regolith-session-cosmic-runtime"; then
+        echo "expected package runtime to source the installed COSMIC helper" >&2
+        exit 1
+    fi
+}
+
+assert_runtime_target_lifecycle() {
+    rm -f "$log_file"
+
+    set +e
+    run_runtime true bash -c 'sleep 0.1; exit 23'
+    runtime_status=$?
+    set -e
+
+    if [ "$runtime_status" -ne 23 ]; then
+        echo "expected runtime to preserve compositor exit status, got $runtime_status" >&2
+        exit 1
+    fi
+
+    if [ "$(grep -c '^systemctl argc=3 args=--user start cosmic-session.target$' "$log_file")" -ne 1 ]; then
+        echo "expected runtime to start cosmic-session.target exactly once after readiness" >&2
+        exit 1
+    fi
+
+    if [ "$(grep -c '^systemctl argc=3 args=--user stop cosmic-session.target$' "$log_file")" -ne 1 ]; then
+        echo "expected runtime to stop cosmic-session.target during compositor cleanup" >&2
+        exit 1
+    fi
+
+    if ! grep -qx helpers "$log_file"; then
+        echo "expected runtime to preserve COSMIC optional helper startup" >&2
+        exit 1
+    fi
+}
+
+assert_runtime_skips_target_before_readiness() {
+    rm -f "$log_file"
+
+    set +e
+    run_runtime false bash -c 'exit 17'
+    runtime_status=$?
+    set -e
+
+    if [ "$runtime_status" -ne 17 ]; then
+        echo "expected early compositor failure status to be preserved, got $runtime_status" >&2
+        exit 1
+    fi
+
+    if grep -Fq 'args=--user start cosmic-session.target' "$log_file" 2>/dev/null; then
+        echo "expected runtime not to start cosmic-session.target before compositor readiness" >&2
+        exit 1
+    fi
+}
+
+assert_runtime_cleans_up_failed_target_start() {
+    rm -f "$log_file"
+
+    export REGOLITH_COSMIC_TEST_SYSTEMCTL_START_FAIL=true
+    set +e
+    run_runtime true bash -c 'sleep 0.1; exit 29'
+    runtime_status=$?
+    set -e
+    unset REGOLITH_COSMIC_TEST_SYSTEMCTL_START_FAIL
+
+    if [ "$runtime_status" -ne 29 ]; then
+        echo "expected target-start failure path to preserve compositor exit status, got $runtime_status" >&2
+        exit 1
+    fi
+
+    if [ "$(grep -c '^systemctl argc=3 args=--user start cosmic-session.target$' "$log_file")" -ne 1 ]; then
+        echo "expected failed target start to be attempted once" >&2
+        exit 1
+    fi
+
+    if [ "$(grep -c '^systemctl argc=3 args=--user stop cosmic-session.target$' "$log_file")" -ne 1 ]; then
+        echo "expected failed target start to still run target cleanup" >&2
+        exit 1
+    fi
+
+    if grep -qx helpers "$log_file"; then
+        echo "expected helper startup to be skipped after target start failure" >&2
+        exit 1
+    fi
+}
+
+assert_runtime_uses_installed_helper
+assert_runtime_target_lifecycle
+assert_runtime_skips_target_before_readiness
+assert_runtime_cleans_up_failed_target_start

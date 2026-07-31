@@ -11,10 +11,25 @@ compositor_pid=$!
 
 if wait_for_regolith_cosmic_wayland_socket; then
     if wait_for_regolith_cosmic_sway_socket; then
-        start_regolith_cosmic_helpers
+        if kill -0 "$compositor_pid" >/dev/null 2>&1; then
+            if systemctl --user start cosmic-session.target; then
+                start_regolith_cosmic_helpers
+            else
+                echo "regolith-session: failed to start cosmic-session.target; skipping COSMIC helper startup" >&2
+            fi
+        else
+            echo "regolith-session: compositor exited before COSMIC readiness; skipping target startup" >&2
+        fi
     else
         echo "regolith-session: Sway IPC socket was not found; skipping COSMIC helper startup" >&2
     fi
 fi
 
+set +e
 wait "$compositor_pid"
+compositor_status=$?
+set -e
+
+systemctl --user stop cosmic-session.target || true
+
+exit "$compositor_status"
