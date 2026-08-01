@@ -30,6 +30,13 @@ if grep -Fq "kanshi" "$COSMIC_TARGET"; then fail "COSMIC target pulls kanshi"; f
 [ -f "$COSMIC_DISPLAYD_DROPIN" ] || fail "COSMIC displayd ordering drop-in is missing"
 has_line "$COSMIC_INPUTD_DROPIN" "After=cosmic-session.target" || fail "COSMIC inputd ordering is missing"
 has_line "$COSMIC_DISPLAYD_DROPIN" "After=cosmic-session.target" || fail "COSMIC displayd ordering is missing"
+has_line "$COSMIC_INPUTD_DROPIN" "PartOf=cosmic-session.target" || fail "COSMIC inputd lifecycle ownership is missing"
+has_line "$COSMIC_DISPLAYD_DROPIN" "PartOf=cosmic-session.target" || fail "COSMIC displayd lifecycle ownership is missing"
+for dropin in "$COSMIC_INPUTD_DROPIN" "$COSMIC_DISPLAYD_DROPIN"; do
+    has_line "$dropin" "Environment=XDG_CURRENT_DESKTOP=COSMIC" || fail "COSMIC desktop identity is missing"
+    has_line "$dropin" "Environment=XDG_SESSION_DESKTOP=cosmic" || fail "COSMIC session identity is missing"
+    has_line "$dropin" "Environment=DESKTOP_SESSION=cosmic" || fail "COSMIC desktop session identity is missing"
+done
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/user/regolith-cosmic.target" || fail "COSMIC target is not packaged"
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/user/regolith-init-inputd.service.d/20-regolith-cosmic-session.conf" || fail "COSMIC inputd drop-in is not packaged"
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/user/regolith-init-displayd.service.d/20-regolith-cosmic-session.conf" || fail "COSMIC displayd drop-in is not packaged"
@@ -37,6 +44,8 @@ has_line "$ROOT_DIR/debian/regolith-session-sway.install" "usr/lib/systemd/user/
 
 if grep -Fq "regolith-init-inputd.service.d" "$ROOT_DIR/debian/regolith-session-sway.install"; then fail "GNOME package gained COSMIC inputd ordering"; fi
 if grep -Fq "regolith-init-displayd.service.d" "$ROOT_DIR/debian/regolith-session-sway.install"; then fail "GNOME package gained COSMIC displayd ordering"; fi
+if grep -Eq "cosmic-session.target|XDG_CURRENT_DESKTOP=COSMIC|XDG_SESSION_DESKTOP=cosmic|DESKTOP_SESSION=cosmic" "$GNOME_TARGET"; then fail "GNOME target gained COSMIC settings"; fi
+if grep -Eq "regolith-session-cosmic|20-regolith-cosmic-session.conf" "$ROOT_DIR/debian/regolith-session-sway.install"; then fail "GNOME package gained COSMIC files"; fi
 
 for source in "$ROOT_DIR/usr/bin/regolith-session-cosmic-launch" "$ROOT_DIR/usr/lib/regolith/regolith-session-cosmic.sh"; do
     if grep -Fq "regolith_cosmic_disable_legacy_helpers" "$source"; then fail "COSMIC source still masks legacy helpers"; fi

@@ -3,3 +3,6 @@
 %:
 	dh $@
 
+override_dh_auto_test:
+	dh_auto_test
+	for test_file in tests/*.sh; do bash "$$test_file"; done
