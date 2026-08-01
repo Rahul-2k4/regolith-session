@@ -67,4 +67,9 @@ if [[ "${unsupported_gpu,,}" == "true" ]]; then
 fi
 
 echo "Regolith is launching COSMIC session with Sway using $SWAY_CONFIG_FILE"
-exec dbus-run-session -- /usr/bin/cosmic-session "${sway_command[@]}"
+set +e
+dbus-run-session -- /usr/bin/cosmic-session "${sway_command[@]}"
+session_status=$?
+systemctl --user unset-environment XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP DESKTOP_SESSION
+set -e
+exit "$session_status"
