@@ -91,9 +91,6 @@ make_stub "cosmic-settings-daemon"
 make_stub "cosmic-osd"
 make_stub "cosmic-idle"
 make_stub "cosmolith"
-make_stub "regolith-displayd"
-make_stub "regolith-inputd"
-make_stub "systemctl"
 
 assert_wayland_socket_fallback() {
     local socket_dir="${XDG_RUNTIME_DIR:-}"
@@ -246,55 +243,6 @@ export REGOLITH_COSMIC_DISABLE_PROCESS_CHECK=true
 export REGOLITH_COSMIC_OSD_DELAY_SECONDS=0.1
 start_regolith_cosmic_helpers
 
-if ! wait_for_log_entry 'systemctl argc=5 args=--user mask --runtime --now regolith-init-inputd.service'; then
-    echo "expected legacy input daemon to be runtime-masked for the COSMIC session" >&2
-    exit 1
-fi
-
-if ! wait_for_log_entry 'systemctl argc=3 args=--user reset-failed regolith-init-inputd.service'; then
-    echo "expected failed legacy input daemon state to be reset" >&2
-    exit 1
-fi
-
-if ! wait_for_log_entry 'systemctl argc=5 args=--user mask --runtime --now regolith-init-displayd.service'; then
-    echo "expected legacy display daemon to be runtime-masked for the COSMIC session" >&2
-    exit 1
-fi
-
-if ! wait_for_log_entry 'systemctl argc=3 args=--user reset-failed regolith-init-displayd.service'; then
-    echo "expected legacy display daemon state to be reset" >&2
-    exit 1
-fi
-
-if ! wait_for_log_entry 'regolith-displayd argc=0 args='; then
-    echo "expected COSMIC-owned startup to launch regolith-displayd when available" >&2
-    exit 1
-fi
-
-if ! wait_for_log_entry 'regolith-inputd argc=0 args='; then
-    echo "expected COSMIC-owned startup to launch regolith-inputd when available" >&2
-    exit 1
-fi
-
-if [ "$(grep -c '^regolith-displayd argc=0 args=$' "$log_file" || true)" -ne 1 ]; then
-    echo "expected regolith-displayd to be launched once" >&2
-    exit 1
-fi
-
-if [ "$(grep -c '^regolith-inputd argc=0 args=$' "$log_file" || true)" -ne 1 ]; then
-    echo "expected regolith-inputd to be launched once" >&2
-    exit 1
-fi
-
-if ! wait_for_log_entry 'systemctl argc=5 args=--user mask --runtime --now regolith-init-kanshi.service'; then
-    echo "expected legacy kanshi helper to be runtime-masked for the COSMIC session" >&2
-    exit 1
-fi
-
-if ! wait_for_log_entry 'systemctl argc=3 args=--user reset-failed regolith-init-kanshi.service'; then
-    echo "expected failed legacy kanshi helper state to be reset" >&2
-    exit 1
-fi
 
 if ! wait_for_log_entry 'cosmolith argc=0 args='; then
     echo "expected cosmolith to autostart when a sway socket is available" >&2
@@ -321,16 +269,5 @@ REGOLITH_COSMIC_ENABLE_IDLE=true start_regolith_cosmic_helpers
 
 if ! wait_for_log_entry 'cosmic-idle argc=0 args='; then
     echo "expected cosmic-idle to autostart when enabled explicitly" >&2
-    exit 1
-fi
-
-no_daemon_path="$workdir/no-daemon-bin"
-mkdir -p "$no_daemon_path"
-rm -f "$log_file"
-PATH="$no_daemon_path" regolith_cosmic_start_existing_daemon regolith-displayd
-PATH="$no_daemon_path" regolith_cosmic_start_existing_daemon regolith-inputd
-
-if [ -s "$log_file" ]; then
-    echo "expected missing existing daemons to be a no-op" >&2
     exit 1
 fi

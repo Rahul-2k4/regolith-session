@@ -35,33 +35,6 @@ regolith_cosmic_process_is_running() {
     pgrep -u "$user" -f "(^|/)$escaped_program( |$)" >/dev/null 2>&1
 }
 
-regolith_cosmic_user_systemctl() {
-    if ! command -v systemctl >/dev/null 2>&1; then
-        return 1
-    fi
-
-    systemctl --user "$@"
-}
-
-regolith_cosmic_stop_user_service() {
-    local unit="$1"
-
-    regolith_cosmic_user_systemctl stop "$unit" >/dev/null 2>&1 || true
-    regolith_cosmic_user_systemctl reset-failed "$unit" >/dev/null 2>&1 || true
-}
-
-regolith_cosmic_runtime_mask_user_service() {
-    local unit="$1"
-
-    regolith_cosmic_user_systemctl mask --runtime --now "$unit" >/dev/null 2>&1 || true
-    regolith_cosmic_user_systemctl reset-failed "$unit" >/dev/null 2>&1 || true
-}
-
-regolith_cosmic_disable_legacy_helpers() {
-    regolith_cosmic_runtime_mask_user_service regolith-init-inputd.service
-    regolith_cosmic_runtime_mask_user_service regolith-init-displayd.service
-    regolith_cosmic_runtime_mask_user_service regolith-init-kanshi.service
-}
 
 regolith_cosmic_configure_status_bar() {
     local source_config="${1:-/etc/regolith/i3status-rust/config.toml}"
@@ -124,11 +97,6 @@ regolith_cosmic_start_optional_process_after() {
     nohup bash -c 'sleep "$1"; shift; exec "$@"' bash "$delay_seconds" "$program" "$@" >/dev/null 2>&1 &
 }
 
-regolith_cosmic_start_existing_daemon() {
-    # COSMIC owns these existing daemons directly. Their legacy user units
-    # remain masked because those units carry GNOME-session dependencies.
-    regolith_cosmic_start_optional_process "$@"
-}
 
 regolith_cosmic_wayland_socket_path() {
     local runtime_dir="${XDG_RUNTIME_DIR-}"
@@ -210,10 +178,6 @@ wait_for_regolith_cosmic_sway_socket() {
 }
 
 start_regolith_cosmic_helpers() {
-    regolith_cosmic_disable_legacy_helpers
-
-    regolith_cosmic_start_existing_daemon regolith-displayd
-    regolith_cosmic_start_existing_daemon regolith-inputd
 
     if regolith_cosmic_bool_is_true "${REGOLITH_COSMIC_ENABLE_COSMOLITH:-true}"; then
         if wait_for_regolith_cosmic_sway_socket; then
