@@ -1,0 +1,63 @@
+#!/bin/bash
+# Experimental Regolith session launcher that runs Sway under COSMIC's
+# session manager while preserving Regolith's existing resource pipeline.
+
+set -Eeu -o pipefail
+export XDG_SESSION_TYPE="wayland"
+source /usr/lib/regolith/regolith-session-common.sh
+source /usr/lib/regolith/regolith-session-cosmic.sh
+
+COSMIC_RUNTIME_WRAPPER="/usr/lib/regolith/regolith-session-cosmic-runtime"
+
+if ! command -v cosmic-session >/dev/null 2>&1; then
+    echo "regolith-session: cosmic-session is not installed" >&2
+    echo "Install COSMIC packages and retry (example: cosmic-session cosmic-settings cosmic-osd cosmic-idle)." >&2
+    exit 1
+fi
+
+if ! command -v sway >/dev/null 2>&1; then
+    echo "regolith-session: sway is not installed" >&2
+    exit 1
+fi
+
+# When this launcher is started directly by the display manager there is no
+# gnome-session wrapper to initialize the trawl environment for us.
+if [ -z "${NOTIFY_SOCKET-}" ]; then
+    trawld &
+
+    while read -r line; do
+        eval export "$line"
+    done < <(/usr/lib/systemd/user-environment-generators/30-systemd-environment-d-generator)
+fi
+
+# Mirror the Regolith-on-Wayland setup so the experimental session uses the
+# same generated Sway config, look initialization, and trawl resources.
+resolve_default_config_file
+load_standard_trawlres
+load_regolith_trawlres
+load_regolith_trawlres
+trawl_sway_cleanup
+
+UPDATE_FLAG_DIR="$HOME/.config/regolith3/flags"
+if [ ! -e "$UPDATE_FLAG_DIR" ]; then
+    LOADER_PATH="$($RESOURCE_GETTER regolith.look.loader)"
+    if [ -n "$LOADER_PATH" ]; then
+        source "$LOADER_PATH"
+        load_look
+    fi
+fi
+
+export XDG_CURRENT_DESKTOP="Regolith-Wayland:COSMIC:sway"
+export XDG_SESSION_DESKTOP="cosmic"
+export DESKTOP_SESSION="cosmic"
+
+regolith_cosmic_configure_status_bar "$(trawlcat wm.bar.status_config /etc/regolith/i3status-rust/config.toml)"
+
+unsupported_gpu=$(trawlcat regolith.sway.unsupported_gpu false)
+sway_command=("$COSMIC_RUNTIME_WRAPPER" sway -c "$SWAY_CONFIG_FILE")
+if [[ "${unsupported_gpu,,}" == "true" ]]; then
+    sway_command+=(--unsupported-gpu)
+fi
+
+echo "Regolith is launching COSMIC session with Sway using $SWAY_CONFIG_FILE"
+exec dbus-run-session -- /usr/bin/cosmic-session "${sway_command[@]}"

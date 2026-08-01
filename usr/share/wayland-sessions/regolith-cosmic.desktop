@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Regolith / COSMIC (Experimental)
+Comment=Start Regolith resources and Sway under COSMIC session management
+Exec=/usr/bin/regolith-session-cosmic-launch
+TryExec=/usr/bin/cosmic-session
+Type=Application
+DesktopNames=Regolith-Wayland
