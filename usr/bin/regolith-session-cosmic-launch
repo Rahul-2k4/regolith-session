@@ -51,6 +51,13 @@ export XDG_CURRENT_DESKTOP="Regolith-Wayland:COSMIC:sway"
 export XDG_SESSION_DESKTOP="cosmic"
 export DESKTOP_SESSION="cosmic"
 
+# Pass COSMIC identity to helper services started by the user manager without
+# changing the shared service units used by the GNOME session.
+systemctl --user set-environment \
+    XDG_CURRENT_DESKTOP=COSMIC \
+    XDG_SESSION_DESKTOP=cosmic \
+    DESKTOP_SESSION=cosmic
+
 regolith_cosmic_configure_status_bar "$(trawlcat wm.bar.status_config /etc/regolith/i3status-rust/config.toml)"
 
 unsupported_gpu=$(trawlcat regolith.sway.unsupported_gpu false)
