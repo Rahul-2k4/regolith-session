@@ -3,3 +3,5 @@ usr/lib/regolith/regolith-session-cosmic.sh
 usr/lib/regolith/regolith-session-cosmic-runtime
 usr/share/wayland-sessions/regolith-cosmic.desktop
 usr/lib/systemd/user/regolith-cosmic.target
+usr/lib/systemd/user/regolith-init-inputd.service.d/20-regolith-cosmic-session.conf
+usr/lib/systemd/user/regolith-init-displayd.service.d/20-regolith-cosmic-session.conf
