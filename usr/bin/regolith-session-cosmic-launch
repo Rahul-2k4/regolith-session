@@ -64,6 +64,42 @@ regolith_cosmic_abort_session() {
     regolith_cosmic_unset_manager_environment
 }
 
+regolith_cosmic_wait_for_sway_socket() {
+    local runtime_dir="${XDG_RUNTIME_DIR:-}"
+    local timeout_seconds="${REGOLITH_COSMIC_SWAY_SOCKET_TIMEOUT_SECONDS:-15}"
+    local deadline=
+    local candidate=
+
+    if [ -z "$runtime_dir" ]; then
+        return 1
+    fi
+
+    case "$timeout_seconds" in
+        ''|*[!0-9]*)
+            return 1
+            ;;
+    esac
+
+    deadline=$((SECONDS + timeout_seconds))
+    while (( SECONDS < deadline )); do
+        if ! kill -0 "$session_pid" >/dev/null 2>&1; then
+            return 1
+        fi
+
+        for candidate in "$runtime_dir"/sway-ipc.*.sock; do
+            if [ -S "$candidate" ]; then
+                SWAYSOCK="$candidate"
+                export SWAYSOCK
+                return 0
+            fi
+        done
+
+        sleep 0.1
+    done
+
+    return 1
+}
+
 # Pass COSMIC identity to helper services started by the user manager without
 # changing the shared service units used by the GNOME session.
 systemctl --user set-environment \
@@ -84,6 +120,12 @@ set +e
 dbus-run-session -- /usr/bin/cosmic-session "${sway_command[@]}" &
 session_pid=$!
 if ! kill -0 "$session_pid" >/dev/null 2>&1; then
+    regolith_cosmic_abort_session "$session_pid"
+    set -e
+    exit 1
+fi
+
+if ! regolith_cosmic_wait_for_sway_socket; then
     regolith_cosmic_abort_session "$session_pid"
     set -e
     exit 1
