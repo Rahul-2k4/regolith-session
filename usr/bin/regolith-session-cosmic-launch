@@ -52,7 +52,7 @@ export XDG_SESSION_DESKTOP="cosmic"
 export DESKTOP_SESSION="cosmic"
 
 regolith_cosmic_unset_manager_environment() {
-    systemctl --user unset-environment XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP DESKTOP_SESSION >/dev/null 2>&1 || true
+    systemctl --user unset-environment XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP DESKTOP_SESSION SWAYSOCK >/dev/null 2>&1 || true
 }
 
 regolith_cosmic_abort_session() {
@@ -87,7 +87,7 @@ regolith_cosmic_wait_for_sway_socket() {
         fi
 
         for candidate in "$runtime_dir"/sway-ipc.*.sock; do
-            if [ -S "$candidate" ]; then
+            if [ -S "$candidate" ] && SWAYSOCK="$candidate" timeout 1s swaymsg -t get_version >/dev/null 2>&1; then
                 SWAYSOCK="$candidate"
                 export SWAYSOCK
                 return 0
@@ -129,6 +129,14 @@ if ! regolith_cosmic_wait_for_sway_socket; then
     regolith_cosmic_abort_session "$session_pid"
     set -e
     exit 1
+fi
+
+systemctl --user set-environment SWAYSOCK="$SWAYSOCK"
+sway_environment_status=$?
+if [ "$sway_environment_status" -ne 0 ]; then
+    regolith_cosmic_abort_session "$session_pid"
+    set -e
+    exit "$sway_environment_status"
 fi
 
 systemctl --user start cosmic-session.target
