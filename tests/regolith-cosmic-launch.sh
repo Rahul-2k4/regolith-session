@@ -10,19 +10,34 @@ grep -Fq 'XDG_CURRENT_DESKTOP=COSMIC' "$LAUNCHER"
 grep -Fq 'XDG_SESSION_DESKTOP=cosmic' "$LAUNCHER"
 grep -Fq 'DESKTOP_SESSION=cosmic' "$LAUNCHER"
 set_environment_line="$(grep -n 'systemctl --user set-environment' "$LAUNCHER" | cut -d: -f1)"
-launch_line="$(grep -n 'dbus-run-session -- /usr/bin/cosmic-session' "$LAUNCHER" | cut -d: -f1)"
-set_nonzero_line="$(grep -nF 'set +e' "$LAUNCHER" | cut -d: -f1)"
-status_line="$(grep -nF 'session_status=$?' "$LAUNCHER" | cut -d: -f1)"
-unset_environment_line="$(grep -nF 'systemctl --user unset-environment XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP DESKTOP_SESSION' "$LAUNCHER" | cut -d: -f1)"
-restore_errexit_line="$(grep -nF 'set -e' "$LAUNCHER" | tail -n1 | cut -d: -f1)"
+launch_line="$(grep -nF 'dbus-run-session -- /usr/bin/cosmic-session "${sway_command[@]}" &' "$LAUNCHER" | cut -d: -f1)"
+alive_line="$(grep -nF 'if ! kill -0 "$session_pid"' "$LAUNCHER" | cut -d: -f1)"
+start_target_line="$(grep -nF 'systemctl --user start cosmic-session.target' "$LAUNCHER" | cut -d: -f1)"
+target_status_line="$(grep -nF 'target_status=$?' "$LAUNCHER" | cut -d: -f1)"
+target_failure_line="$(grep -nF 'if [ "$target_status" -ne 0 ]' "$LAUNCHER" | cut -d: -f1)"
+abort_lines="$(grep -nF 'regolith_cosmic_abort_session "$session_pid"' "$LAUNCHER" | cut -d: -f1)"
+normal_wait_line="$(grep -nF 'wait "$session_pid"' "$LAUNCHER" | tail -n1 | cut -d: -f1)"
+stop_target_line="$(grep -nF 'systemctl --user stop cosmic-session.target' "$LAUNCHER" | tail -n1 | cut -d: -f1)"
+unset_call_line="$(grep -nF 'regolith_cosmic_unset_manager_environment' "$LAUNCHER" | tail -n1 | cut -d: -f1)"
 exit_status_line="$(grep -nF 'exit "$session_status"' "$LAUNCHER" | cut -d: -f1)"
+set_nonzero_line="$(grep -nF 'set +e' "$LAUNCHER" | cut -d: -f1)"
 [ -n "$set_environment_line" ] && [ -n "$set_nonzero_line" ] && [ -n "$launch_line" ]
-[ -n "$status_line" ] && [ -n "$unset_environment_line" ] && [ -n "$restore_errexit_line" ] && [ -n "$exit_status_line" ]
+[ -n "$alive_line" ] && [ -n "$start_target_line" ] && [ -n "$target_status_line" ] && [ -n "$target_failure_line" ]
+[ -n "$abort_lines" ] && [ -n "$normal_wait_line" ] && [ -n "$stop_target_line" ] && [ -n "$unset_call_line" ] && [ -n "$exit_status_line" ]
 [ "$set_environment_line" -lt "$launch_line" ]
 [ "$set_nonzero_line" -lt "$launch_line" ]
-[ "$launch_line" -lt "$status_line" ]
-[ "$status_line" -lt "$unset_environment_line" ]
-[ "$unset_environment_line" -lt "$restore_errexit_line" ]
-[ "$restore_errexit_line" -lt "$exit_status_line" ]
+[ "$launch_line" -lt "$alive_line" ]
+[ "$alive_line" -lt "$start_target_line" ]
+[ "$start_target_line" -lt "$target_status_line" ]
+[ "$target_status_line" -lt "$target_failure_line" ]
+[ "$normal_wait_line" -lt "$stop_target_line" ]
+[ "$stop_target_line" -lt "$unset_call_line" ]
+[ "$unset_call_line" -lt "$exit_status_line" ]
+[ "$(printf '%s\n' "$abort_lines" | head -n1)" -lt "$target_failure_line" ]
+[ "$(printf '%s\n' "$abort_lines" | tail -n1)" -gt "$target_failure_line" ]
+grep -Fq 'kill "$pid"' "$LAUNCHER"
+grep -Fq 'wait "$pid"' "$LAUNCHER"
+grep -Fq 'systemctl --user stop cosmic-session.target' "$LAUNCHER"
+grep -Fq 'systemctl --user unset-environment XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP DESKTOP_SESSION' "$LAUNCHER"
 ! grep -Fq 'exec dbus-run-session -- /usr/bin/cosmic-session' "$LAUNCHER"
 ! grep -Fq 'exec cosmic-session "${sway_command[@]}"' "$LAUNCHER"

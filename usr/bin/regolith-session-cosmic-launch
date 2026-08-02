@@ -51,6 +51,19 @@ export XDG_CURRENT_DESKTOP="Regolith-Wayland:COSMIC:sway"
 export XDG_SESSION_DESKTOP="cosmic"
 export DESKTOP_SESSION="cosmic"
 
+regolith_cosmic_unset_manager_environment() {
+    systemctl --user unset-environment XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP DESKTOP_SESSION >/dev/null 2>&1 || true
+}
+
+regolith_cosmic_abort_session() {
+    local pid="$1"
+
+    kill "$pid" >/dev/null 2>&1 || true
+    wait "$pid" >/dev/null 2>&1 || true
+    systemctl --user stop cosmic-session.target >/dev/null 2>&1 || true
+    regolith_cosmic_unset_manager_environment
+}
+
 # Pass COSMIC identity to helper services started by the user manager without
 # changing the shared service units used by the GNOME session.
 systemctl --user set-environment \
@@ -68,8 +81,25 @@ fi
 
 echo "Regolith is launching COSMIC session with Sway using $SWAY_CONFIG_FILE"
 set +e
-dbus-run-session -- /usr/bin/cosmic-session "${sway_command[@]}"
+dbus-run-session -- /usr/bin/cosmic-session "${sway_command[@]}" &
+session_pid=$!
+if ! kill -0 "$session_pid" >/dev/null 2>&1; then
+    regolith_cosmic_abort_session "$session_pid"
+    set -e
+    exit 1
+fi
+
+systemctl --user start cosmic-session.target
+target_status=$?
+if [ "$target_status" -ne 0 ]; then
+    regolith_cosmic_abort_session "$session_pid"
+    set -e
+    exit "$target_status"
+fi
+
+wait "$session_pid"
 session_status=$?
-systemctl --user unset-environment XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP DESKTOP_SESSION
+systemctl --user stop cosmic-session.target >/dev/null 2>&1 || true
+regolith_cosmic_unset_manager_environment
 set -e
 exit "$session_status"
