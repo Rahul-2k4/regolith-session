@@ -3,6 +3,7 @@ Description=Regolith GNOME session helpers
 After=gnome-session.target
 PartOf=gnome-session.target
 Wants=regolith-init-inputd.service regolith-init-displayd.service regolith-init-kanshi.service
+Wants=regolith-init-powerd.service
 
 [Install]
 WantedBy=gnome-session.target

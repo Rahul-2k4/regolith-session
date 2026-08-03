@@ -27,9 +27,11 @@ The launcher initializes Regolith trawl resources, sets `XDG_CURRENT_DESKTOP=Reg
 - COSMIC runtime owns `cosmic-settings-daemon` and delayed `cosmic-osd` startup.
 - `cosmolith` starts after the Sway IPC socket is available.
 - regolith-cosmic.target is installed WantedBy=cosmic-session.target and wants regolith-init-inputd.service and regolith-init-displayd.service.
-- regolith-gnome.target is installed WantedBy=gnome-session.target and wants inputd, displayd, and regolith-init-kanshi.service; kanshi remains GNOME-only.
+- regolith-gnome.target is installed WantedBy=gnome-session.target and wants inputd, displayd, regolith-init-kanshi.service, and regolith-init-powerd.service; kanshi and powerd remain GNOME-only.
+- regolith-cosmic.target conflicts with regolith-init-powerd.service so stale powerd activation is stopped in COSMIC sessions.
 - The COSMIC launcher does not mask, stop, reset, or directly start the target-owned inputd/displayd/kanshi services.
-- cosmic-idle is opt-in with REGOLITH_COSMIC_ENABLE_IDLE=true until lock/idle validation is complete.
+
+The target conflict prevents the legacy powerd stack from coexisting with COSMIC idle, but does not yet prove the lock lifecycle (idle timeout, lock, unlock, and recovery).
 
 ## Validation
 
