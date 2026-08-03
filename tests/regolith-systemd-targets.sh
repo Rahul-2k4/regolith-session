@@ -13,11 +13,9 @@ has_line() { grep -Fqx "$2" "$1"; }
 [ -f "$GNOME_TARGET" ] || fail "missing GNOME target"
 [ -f "$COSMIC_TARGET" ] || fail "missing COSMIC target"
 [ -f "$GNOME_DROPIN" ] || fail "missing GNOME parent drop-in"
-[ -f "$COSMIC_DROPIN" ] || fail "missing COSMIC parent drop-in"
+[ ! -e "$COSMIC_DROPIN" ] || fail "COSMIC parent drop-in must not exist"
 has_line "$GNOME_DROPIN" "[Unit]" || fail "GNOME parent drop-in section is missing"
 has_line "$GNOME_DROPIN" "Wants=regolith-gnome.target" || fail "GNOME parent drop-in wiring is missing"
-has_line "$COSMIC_DROPIN" "[Unit]" || fail "COSMIC parent drop-in section is missing"
-has_line "$COSMIC_DROPIN" "Wants=regolith-cosmic.target" || fail "COSMIC parent drop-in wiring is missing"
 has_line "$GNOME_TARGET" "After=gnome-session.target" || fail "GNOME ordering is missing"
 has_line "$GNOME_TARGET" "PartOf=gnome-session.target" || fail "GNOME ownership is missing"
 has_line "$GNOME_TARGET" "WantedBy=gnome-session.target" || fail "GNOME install wiring is missing"
@@ -32,7 +30,7 @@ if grep -Fq "kanshi" "$COSMIC_TARGET"; then fail "COSMIC target pulls kanshi"; f
 has_line "$ROOT_DIR/debian/regolith-session-sway.install" "usr/lib/systemd/user/regolith-gnome.target" || fail "GNOME target is not packaged"
 has_line "$ROOT_DIR/debian/regolith-session-sway.install" "usr/lib/systemd/user/gnome-session.target.d" || fail "GNOME parent drop-in is not packaged"
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/user/regolith-cosmic.target" || fail "COSMIC target is not packaged"
-has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/user/cosmic-session.target.d" || fail "COSMIC parent drop-in is not packaged"
+if grep -Fq "usr/lib/systemd/user/cosmic-session.target.d" "$ROOT_DIR/debian/regolith-session-cosmic.install"; then fail "COSMIC parent drop-in must not be packaged"; fi
 has_line "$ROOT_DIR/debian/regolith-session-sway.install" "usr/share/wayland-sessions/regolith-wayland.desktop" || fail "Sway Wayland desktop entry is not packaged explicitly"
 if grep -Fqx "usr/share/wayland-sessions" "$ROOT_DIR/debian/regolith-session-sway.install"; then fail "Sway package uses a broad Wayland desktop entry wildcard"; fi
 if comm -12 <(sed -n "s#^usr/share/wayland-sessions/##p" "$ROOT_DIR/debian/regolith-session-sway.install" | sort) <(sed -n "s#^usr/share/wayland-sessions/##p" "$ROOT_DIR/debian/regolith-session-cosmic.install" | sort) | grep -q .; then fail "Sway and COSMIC packages own the same Wayland desktop entry"; fi
