@@ -6,7 +6,6 @@ GNOME_TARGET="$ROOT_DIR/usr/lib/systemd/user/regolith-gnome.target"
 COSMIC_TARGET="$ROOT_DIR/usr/lib/systemd/user/regolith-cosmic.target"
 GNOME_DROPIN="$ROOT_DIR/usr/lib/systemd/user/gnome-session.target.d/regolith-gnome.conf"
 COSMIC_DROPIN="$ROOT_DIR/usr/lib/systemd/user/cosmic-session.target.d/regolith-cosmic.conf"
-POWERD_COSMIC_DROPIN="$ROOT_DIR/usr/lib/systemd/user/regolith-init-powerd.service.d/regolith-cosmic.conf"
 
 fail() { echo "systemd target test: $*" >&2; exit 1; }
 has_line() { grep -Fqx "$2" "$1"; }
@@ -15,9 +14,7 @@ has_line() { grep -Fqx "$2" "$1"; }
 [ -f "$COSMIC_TARGET" ] || fail "missing COSMIC target"
 [ -f "$GNOME_DROPIN" ] || fail "missing GNOME parent drop-in"
 [ ! -e "$COSMIC_DROPIN" ] || fail "COSMIC parent drop-in must not exist"
-[ -f "$POWERD_COSMIC_DROPIN" ] || fail "COSMIC powerd drop-in is missing"
-has_line "$POWERD_COSMIC_DROPIN" "[Unit]" || fail "COSMIC powerd drop-in section is missing"
-has_line "$POWERD_COSMIC_DROPIN" "ConditionEnvironment=!XDG_CURRENT_DESKTOP=Regolith-Wayland:COSMIC:sway" || fail "COSMIC powerd exclusion condition is missing"
+[ ! -e "$ROOT_DIR/usr/lib/systemd/user/regolith-init-powerd.service.d/regolith-cosmic.conf" ] || fail "COSMIC powerd drop-in must not exist"
 has_line "$GNOME_DROPIN" "[Unit]" || fail "GNOME parent drop-in section is missing"
 has_line "$GNOME_DROPIN" "Wants=regolith-gnome.target" || fail "GNOME parent drop-in wiring is missing"
 has_line "$GNOME_TARGET" "After=gnome-session.target" || fail "GNOME ordering is missing"
@@ -30,13 +27,15 @@ has_line "$COSMIC_TARGET" "After=cosmic-session.target" || fail "COSMIC ordering
 has_line "$COSMIC_TARGET" "PartOf=cosmic-session.target" || fail "COSMIC ownership is missing"
 has_line "$COSMIC_TARGET" "WantedBy=cosmic-session.target" || fail "COSMIC install wiring is missing"
 has_line "$COSMIC_TARGET" "Wants=regolith-init-inputd.service regolith-init-displayd.service" || fail "COSMIC helper Wants are incomplete"
+if grep -Fq "regolith-init-powerd.service" "$COSMIC_TARGET"; then fail "COSMIC target owns powerd"; fi
 if grep -Fqx "Wants=cosmic-session.target" "$COSMIC_TARGET"; then fail "COSMIC parent dependency cycle"; fi
 if grep -Fq "Conflicts=regolith-init-powerd.service" "$COSMIC_TARGET"; then fail "COSMIC target must not conflict with powerd"; fi
 if grep -Fq "kanshi" "$COSMIC_TARGET"; then fail "COSMIC target pulls kanshi"; fi
 has_line "$ROOT_DIR/debian/regolith-session-sway.install" "usr/lib/systemd/user/regolith-gnome.target" || fail "GNOME target is not packaged"
 has_line "$ROOT_DIR/debian/regolith-session-sway.install" "usr/lib/systemd/user/gnome-session.target.d" || fail "GNOME parent drop-in is not packaged"
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/user/regolith-cosmic.target" || fail "COSMIC target is not packaged"
-has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/user/regolith-init-powerd.service.d/regolith-cosmic.conf" || fail "COSMIC powerd drop-in is not packaged"
+if grep -Fq "regolith-init-powerd.service" "$ROOT_DIR/debian/regolith-session-cosmic.install"; then fail "COSMIC package owns powerd"; fi
+if grep -Fq "regolith-wayland.target" "$ROOT_DIR/debian/regolith-session-cosmic.install"; then fail "COSMIC package has broad Wayland enablement"; fi
 if grep -Fq "usr/lib/systemd/user/cosmic-session.target.d" "$ROOT_DIR/debian/regolith-session-cosmic.install"; then fail "COSMIC parent drop-in must not be packaged"; fi
 has_line "$ROOT_DIR/debian/regolith-session-sway.install" "usr/share/wayland-sessions/regolith-wayland.desktop" || fail "Sway Wayland desktop entry is not packaged explicitly"
 if grep -Fqx "usr/share/wayland-sessions" "$ROOT_DIR/debian/regolith-session-sway.install"; then fail "Sway package uses a broad Wayland desktop entry wildcard"; fi
