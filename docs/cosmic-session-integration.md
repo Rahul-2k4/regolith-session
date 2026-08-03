@@ -28,10 +28,10 @@ The launcher initializes Regolith trawl resources, sets `XDG_CURRENT_DESKTOP=Reg
 - `cosmolith` starts after the Sway IPC socket is available.
 - regolith-cosmic.target is installed WantedBy=cosmic-session.target and wants regolith-init-inputd.service and regolith-init-displayd.service.
 - regolith-gnome.target is installed WantedBy=gnome-session.target and wants inputd, displayd, regolith-init-kanshi.service, and regolith-init-powerd.service; kanshi and powerd remain GNOME-only.
-- regolith-cosmic.target conflicts with regolith-init-powerd.service so stale powerd activation is stopped in COSMIC sessions.
+- The COSMIC package installs a powerd drop-in with ConditionEnvironment=!XDG_CURRENT_DESKTOP=Regolith-Wayland:COSMIC:sway, so regolith-init-powerd.service refuses activation in the COSMIC session without coupling target lifecycles.
 - The COSMIC launcher does not mask, stop, reset, or directly start the target-owned inputd/displayd/kanshi services.
 
-The target conflict prevents the legacy powerd stack from coexisting with COSMIC idle, but does not yet prove the lock lifecycle (idle timeout, lock, unlock, and recovery).
+This condition prevents the legacy powerd service from starting in the COSMIC session. It does not prove the cosmic-idle lock lifecycle (idle timeout, lock, unlock, and recovery).
 
 ## Validation
 
