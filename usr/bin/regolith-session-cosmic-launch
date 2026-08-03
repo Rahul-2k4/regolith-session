@@ -60,17 +60,40 @@ regolith_cosmic_abort_session() {
 
     kill "$pid" >/dev/null 2>&1 || true
     wait "$pid" >/dev/null 2>&1 || true
-    systemctl --user stop cosmic-session.target >/dev/null 2>&1 || true
+    systemctl --user stop regolith-cosmic.target >/dev/null 2>&1 || true
     regolith_cosmic_unset_manager_environment
 }
 
-regolith_cosmic_wait_for_sway_socket() {
+regolith_cosmic_choose_sway_socket() {
     local runtime_dir="${XDG_RUNTIME_DIR:-}"
-    local timeout_seconds="${REGOLITH_COSMIC_SWAY_SOCKET_TIMEOUT_SECONDS:-15}"
-    local deadline=
-    local candidate=
+    local prefix="${REGOLITH_COSMIC_SWAY_SOCKET_PREFIX:-regolith-cosmic-sway-${BASHPID}}"
+    local suffix=0
+    local sway_socket_path=
 
     if [ -z "$runtime_dir" ]; then
+        return 1
+    fi
+
+    while (( suffix < 100 )); do
+        sway_socket_path="$runtime_dir/${prefix}-${suffix}.sock"
+        if [ "${#sway_socket_path}" -ge 108 ]; then
+            return 1
+        fi
+        if [ ! -e "$sway_socket_path" ]; then
+            SWAYSOCK="$sway_socket_path"
+            return 0
+        fi
+        suffix=$((suffix + 1))
+    done
+
+    return 1
+}
+
+regolith_cosmic_wait_for_sway_socket() {
+    local timeout_seconds="${REGOLITH_COSMIC_SWAY_SOCKET_TIMEOUT_SECONDS:-15}"
+    local deadline=
+
+    if [ -z "${SWAYSOCK-}" ]; then
         return 1
     fi
 
@@ -86,13 +109,9 @@ regolith_cosmic_wait_for_sway_socket() {
             return 1
         fi
 
-        for candidate in "$runtime_dir"/sway-ipc.*.sock; do
-            if [ -S "$candidate" ] && SWAYSOCK="$candidate" timeout 1s swaymsg -t get_version >/dev/null 2>&1; then
-                SWAYSOCK="$candidate"
-                export SWAYSOCK
-                return 0
-            fi
-        done
+        if [ -S "$SWAYSOCK" ] && SWAYSOCK="$SWAYSOCK" timeout 1s swaymsg -t get_version >/dev/null 2>&1; then
+            return 0
+        fi
 
         sleep 0.1
     done
@@ -115,9 +134,15 @@ if [[ "${unsupported_gpu,,}" == "true" ]]; then
     sway_command+=(--unsupported-gpu)
 fi
 
+if ! regolith_cosmic_choose_sway_socket; then
+    echo "regolith-session: unable to reserve a valid Sway IPC socket path" >&2
+    regolith_cosmic_unset_manager_environment
+    exit 1
+fi
+
 echo "Regolith is launching COSMIC session with Sway using $SWAY_CONFIG_FILE"
 set +e
-dbus-run-session -- /usr/bin/cosmic-session "${sway_command[@]}" &
+dbus-run-session -- /usr/bin/cosmic-session env "SWAYSOCK=$SWAYSOCK" "${sway_command[@]}" &
 session_pid=$!
 if ! kill -0 "$session_pid" >/dev/null 2>&1; then
     regolith_cosmic_abort_session "$session_pid"
@@ -139,7 +164,7 @@ if [ "$sway_environment_status" -ne 0 ]; then
     exit "$sway_environment_status"
 fi
 
-systemctl --user start cosmic-session.target
+systemctl --user start regolith-cosmic.target
 target_status=$?
 if [ "$target_status" -ne 0 ]; then
     regolith_cosmic_abort_session "$session_pid"
@@ -149,7 +174,7 @@ fi
 
 wait "$session_pid"
 session_status=$?
-systemctl --user stop cosmic-session.target >/dev/null 2>&1 || true
+systemctl --user stop regolith-cosmic.target >/dev/null 2>&1 || true
 regolith_cosmic_unset_manager_environment
 set -e
 exit "$session_status"
