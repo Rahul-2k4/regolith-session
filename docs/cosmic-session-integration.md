@@ -28,14 +28,14 @@ The launcher initializes Regolith trawl resources, sets `XDG_CURRENT_DESKTOP=Reg
 - `cosmolith` starts after the Sway IPC socket is available.
 - regolith-cosmic.target is installed WantedBy=cosmic-session.target and wants regolith-init-inputd.service and regolith-init-displayd.service.
 - regolith-gnome.target is installed WantedBy=gnome-session.target and wants inputd, displayd, regolith-init-kanshi.service, and regolith-init-powerd.service; kanshi and powerd remain GNOME-only.
-- Powerd ownership is target-scoped: regolith-gnome.target wants regolith-init-powerd.service, while regolith-cosmic.target does not. The COSMIC package installs no powerd drop-in or broad regolith-wayland.target enablement.
+- Powerd ownership is target-scoped: regolith-gnome.target wants regolith-init-powerd.service, while regolith-cosmic.target does not. The COSMIC runtime also protects against a legacy powerd service enabled outside the COSMIC package by applying a runtime-only mask and stopping it for the session, then removing only a mask it created. The COSMIC package installs no powerd drop-in or broad regolith-wayland.target enablement.
 - The COSMIC launcher does not mask, stop, reset, or directly start the target-owned inputd/displayd/kanshi services.
 
 Target ownership keeps the legacy powerd stack on the GNOME path. It does not prove the cosmic-idle lock lifecycle (idle timeout, lock, unlock, and recovery).
 
 ## Validation
 
-Runtime proof for the target-owned COSMIC helper startup is still pending.
+The source fix is runtime isolation of a legacy powerd service enabled outside the COSMIC package. QEMU cold-login proof for the combined session, displayd, inputd, and powerd isolation path is still required; this branch does not claim that proof.
 
 Run:
 
