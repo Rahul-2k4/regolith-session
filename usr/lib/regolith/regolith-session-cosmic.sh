@@ -191,7 +191,4 @@ start_regolith_cosmic_helpers() {
         regolith_cosmic_start_optional_process_after "${REGOLITH_COSMIC_OSD_DELAY_SECONDS:-2}" cosmic-osd
     fi
 
-    if regolith_cosmic_bool_is_true "${REGOLITH_COSMIC_ENABLE_IDLE:-false}"; then
-        regolith_cosmic_start_optional_process cosmic-idle
-    fi
 }
