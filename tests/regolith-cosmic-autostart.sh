@@ -477,7 +477,7 @@ assert_runtime_target_lifecycle() {
     rm -f "$log_file"
 
     set +e
-    run_runtime true bash -c 'sleep 0.1; exit 23'
+    run_runtime true bash -c 'sleep 1; exit 23'
     runtime_status=$?
     set -e
 

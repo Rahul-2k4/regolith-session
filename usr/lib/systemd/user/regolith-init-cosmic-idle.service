@@ -8,4 +8,3 @@ Type=simple
 ExecStart=/usr/lib/regolith/regolith-cosmic-idle-fallback
 Restart=on-failure
 RestartSec=1s
-

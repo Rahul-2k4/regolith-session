@@ -11,8 +11,14 @@ compositor_pid=$!
 target_started=false
 legacy_gnome_target_mask_owned=false
 legacy_wayland_target_mask_owned=false
+cleanup_done=false
 
 regolith_cosmic_runtime_cleanup() {
+    if [ "$cleanup_done" = true ]; then
+        return 0
+    fi
+    cleanup_done=true
+
     if [ "${target_started:-false}" = true ]; then
         systemctl --user stop cosmic-session.target || true
     fi
@@ -27,8 +33,6 @@ regolith_cosmic_runtime_cleanup() {
 
     systemctl --user unset-environment SWAYSOCK || true
 }
-
-trap regolith_cosmic_runtime_cleanup EXIT
 
 regolith_legacy_target_is_pre_masked() {
     local target="$1"
@@ -147,4 +151,5 @@ wait "$compositor_pid"
 compositor_status=$?
 set -e
 
+regolith_cosmic_runtime_cleanup
 exit "$compositor_status"
