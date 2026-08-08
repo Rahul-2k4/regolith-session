@@ -31,11 +31,12 @@ has_line "$COSMIC_TARGET" "WantedBy=cosmic-session.target" || fail "COSMIC insta
 has_line "$COSMIC_TARGET" "Wants=regolith-init-inputd.service regolith-init-displayd.service regolith-init-cosmic-idle.service" || fail "COSMIC idle owner is not target-owned"
 if grep -Fqx "Wants=cosmic-session.target" "$COSMIC_TARGET"; then fail "COSMIC parent dependency cycle"; fi
 if grep -Fq "kanshi" "$COSMIC_TARGET"; then fail "COSMIC target pulls kanshi"; fi
+if grep -Fq "regolith-init-cosmic-idle.service" "$GNOME_TARGET"; then fail "GNOME target activates COSMIC idle"; fi
 [ -f "$COSMIC_IDLE_SERVICE" ] || fail "missing COSMIC idle service"
 [ -f "$COSMIC_RUNTIME" ] || fail "missing COSMIC runtime wrapper"
 has_line "$COSMIC_IDLE_SERVICE" "After=cosmic-session.target" || fail "COSMIC idle service ordering is missing"
 has_line "$COSMIC_IDLE_SERVICE" "PartOf=regolith-cosmic.target" || fail "COSMIC idle service ownership is missing"
-has_line "$COSMIC_IDLE_SERVICE" "ExecStart=/usr/bin/cosmic-idle" || fail "COSMIC native idle is not selected"
+has_line "$COSMIC_IDLE_SERVICE" "ExecStart=/usr/lib/regolith/regolith-cosmic-idle-fallback" || fail "COSMIC fallback is not selected"
 grep -Fq 'SWAYSOCK' "$COSMIC_RUNTIME" || fail "COSMIC runtime does not handle SWAYSOCK"
 grep -Fq 'import-environment WAYLAND_DISPLAY SWAYSOCK' "$COSMIC_RUNTIME" || fail "COSMIC runtime does not import compositor environment"
 grep -Fq 'unset-environment WAYLAND_DISPLAY SWAYSOCK' "$COSMIC_RUNTIME" || fail "COSMIC runtime does not clean up compositor environment"
