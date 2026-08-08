@@ -58,7 +58,7 @@ regolith_cosmic_runtime_cleanup() {
 
     regolith_cosmic_runtime_stop_compositor
     unmask_regolith_legacy_targets_owned_by_cosmic
-    systemctl --user unset-environment SWAYSOCK || true
+    systemctl --user unset-environment WAYLAND_DISPLAY SWAYSOCK || true
     unset SWAYSOCK || true
 }
 
@@ -163,7 +163,7 @@ regolith_cosmic_runtime_main() {
     if wait_for_regolith_cosmic_wayland_socket; then
         if wait_for_regolith_cosmic_sway_socket; then
             if kill -0 "$compositor_pid" >/dev/null 2>&1; then
-                systemctl --user import-environment SWAYSOCK
+                systemctl --user import-environment WAYLAND_DISPLAY SWAYSOCK
 
                 if systemctl --user is-active --quiet cosmic-session.target; then
                     if ! mask_regolith_legacy_targets_for_cosmic; then
