@@ -19,7 +19,7 @@ wait_for_regolith_cosmic_sway_socket() { return 0; }
 start_regolith_cosmic_helpers() { printf '%s\n' helpers >>"$REGOLITH_COSMIC_TEST_LOG"; }
 EOF
 
-sed "s|source /usr/lib/regolith/regolith-session-cosmic.sh|source \"$helper_script\"|" \
+sed "s|source \"\${REGOLITH_COSMIC_SESSION_HELPERS:-/usr/lib/regolith/regolith-session-cosmic.sh}\"|source \"$helper_script\"|" \
     "$ROOT_DIR/usr/lib/regolith/regolith-session-cosmic-runtime" >"$runtime_script"
 chmod +x "$runtime_script"
 
@@ -27,7 +27,7 @@ cat >"$stub_dir/systemctl" <<'EOF'
 #!/bin/bash
 printf 'systemctl %s\n' "$*" >>"$REGOLITH_COSMIC_TEST_LOG"
 case "${2-}" in
-    is-active) exit 3 ;;
+    is-active) exit 0 ;;
     is-enabled) printf '%s\n' disabled; exit 1 ;;
 esac
 EOF
@@ -69,13 +69,15 @@ line_number() {
 }
 
 import_line="$(line_number 'systemctl --user import-environment WAYLAND_DISPLAY SWAYSOCK')"
+restart_line="$(line_number 'systemctl --user restart regolith-cosmic.target')"
 start_line="$(line_number 'systemctl --user start cosmic-session.target')"
 unset_line="$(line_number 'systemctl --user unset-environment WAYLAND_DISPLAY SWAYSOCK')"
 
 [ -n "$import_line" ] || { echo "missing WAYLAND_DISPLAY and SWAYSOCK import" >&2; exit 1; }
-[ -n "$start_line" ] || { echo "missing COSMIC target start" >&2; exit 1; }
+[ -n "$restart_line" ] || { echo "missing COSMIC target reinitialization" >&2; exit 1; }
+[ -z "$start_line" ] || { echo "COSMIC target must be reinitialized, not merely started" >&2; exit 1; }
 [ -n "$unset_line" ] || { echo "missing WAYLAND_DISPLAY and SWAYSOCK cleanup" >&2; exit 1; }
-[ "$import_line" -lt "$start_line" ] || { echo "compositor environment import must precede target start" >&2; exit 1; }
-[ "$start_line" -lt "$unset_line" ] || { echo "compositor environment cleanup must follow target lifecycle" >&2; exit 1; }
+[ "$import_line" -lt "$restart_line" ] || { echo "compositor environment import must precede target reinitialization" >&2; exit 1; }
+[ "$restart_line" -lt "$unset_line" ] || { echo "compositor environment cleanup must follow target lifecycle" >&2; exit 1; }
 
 echo "COSMIC runtime environment lifecycle: PASS"
