@@ -89,10 +89,12 @@ Depends: ${misc:Depends},
     regolith-session-common,
     regolith-sway-root-config,
     sway-regolith,
+    swayidle,
     trawlcat,
     trawld,
     trawldb,
     wl-clipboard,
+    gtklock,
     xwayland
 Recommends:
     cosmic-bg,

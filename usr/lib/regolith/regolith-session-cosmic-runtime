@@ -12,6 +12,24 @@ target_started=false
 legacy_gnome_target_mask_owned=false
 legacy_wayland_target_mask_owned=false
 
+regolith_cosmic_runtime_cleanup() {
+    if [ "${target_started:-false}" = true ]; then
+        systemctl --user stop cosmic-session.target || true
+    fi
+
+    if [ "${legacy_gnome_target_mask_owned:-false}" = true ]; then
+        systemctl --user unmask regolith-gnome.target || true
+    fi
+
+    if [ "${legacy_wayland_target_mask_owned:-false}" = true ]; then
+        systemctl --user unmask regolith-wayland.target || true
+    fi
+
+    systemctl --user unset-environment SWAYSOCK || true
+}
+
+trap regolith_cosmic_runtime_cleanup EXIT
+
 regolith_legacy_target_is_pre_masked() {
     local target="$1"
     local state=
@@ -83,7 +101,9 @@ mask_regolith_legacy_targets_for_cosmic() {
 if wait_for_regolith_cosmic_wayland_socket; then
     if wait_for_regolith_cosmic_sway_socket; then
         if kill -0 "$compositor_pid" >/dev/null 2>&1; then
-            if systemctl --user is-active --quiet cosmic-session.target; then
+            if ! systemctl --user import-environment SWAYSOCK; then
+                echo "regolith-session: failed to import SWAYSOCK into the user manager; skipping COSMIC helper startup" >&2
+            elif systemctl --user is-active --quiet cosmic-session.target; then
                 if mask_regolith_legacy_targets_for_cosmic; then
                     start_regolith_cosmic_helpers
                 else
@@ -126,17 +146,5 @@ set +e
 wait "$compositor_pid"
 compositor_status=$?
 set -e
-
-if [ "$target_started" = true ]; then
-    systemctl --user stop cosmic-session.target || true
-fi
-
-if [ "$legacy_gnome_target_mask_owned" = true ]; then
-    systemctl --user unmask regolith-gnome.target || true
-fi
-
-if [ "$legacy_wayland_target_mask_owned" = true ]; then
-    systemctl --user unmask regolith-wayland.target || true
-fi
 
 exit "$compositor_status"
