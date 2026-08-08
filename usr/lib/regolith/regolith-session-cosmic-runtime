@@ -1,31 +1,202 @@
 #!/bin/bash
-# Start Sway, publish its verified IPC socket to the user manager, and then
-# activate the target-owned COSMIC helpers.
+# Start the Sway compositor for the experimental COSMIC session and only then
+# hand selected helper ownership to COSMIC-side processes.
 
 set -Eeu -o pipefail
 
 source "${REGOLITH_COSMIC_SESSION_HELPERS:-/usr/lib/regolith/regolith-session-cosmic.sh}"
 
+target_started=false
+compositor_pid=
+legacy_gnome_target_mask_owned=false
+legacy_wayland_target_mask_owned=false
+
+regolith_legacy_target_is_pre_masked() {
+    local target="$1"
+    local state=
+
+    state="$(systemctl --user is-enabled "$target" 2>/dev/null || true)"
+
+    case "$state" in
+        masked|masked-runtime)
+            return 0
+            ;;
+        enabled|enabled-runtime|linked|linked-runtime|disabled|static|indirect|generated|transient|alias)
+            return 1
+            ;;
+    esac
+
+    echo "regolith-session: failed to establish mask state for $target; skipping COSMIC helper startup" >&2
+    return 2
+}
+
+unmask_regolith_legacy_targets_owned_by_cosmic() {
+    if [ "$legacy_gnome_target_mask_owned" = true ]; then
+        systemctl --user unmask regolith-gnome.target || true
+        legacy_gnome_target_mask_owned=false
+    fi
+
+    if [ "$legacy_wayland_target_mask_owned" = true ]; then
+        systemctl --user unmask regolith-wayland.target || true
+        legacy_wayland_target_mask_owned=false
+    fi
+}
+
 regolith_cosmic_runtime_cleanup() {
+    local force_target_stop="${1:-false}"
+
+    if [ "$target_started" = true ] || [ "$force_target_stop" = true ]; then
+        systemctl --user stop cosmic-session.target || true
+        target_started=false
+    fi
+
+    regolith_cosmic_runtime_stop_compositor
+    unmask_regolith_legacy_targets_owned_by_cosmic
     systemctl --user unset-environment SWAYSOCK || true
     unset SWAYSOCK || true
 }
 
-trap regolith_cosmic_runtime_cleanup EXIT
+mask_regolith_legacy_targets_for_cosmic() {
+    local gnome_target_pre_masked=false
+    local wayland_target_pre_masked=false
+    local mask_state_status=0
 
-"$@" &
-compositor_pid=$!
-
-if wait_for_regolith_cosmic_wayland_socket; then
-    if wait_for_regolith_cosmic_sway_socket; then
-        if kill -0 "$compositor_pid" >/dev/null 2>&1; then
-            systemctl --user import-environment SWAYSOCK
-            systemctl --user start regolith-cosmic.target
-            start_regolith_cosmic_helpers
-        fi
+    if regolith_legacy_target_is_pre_masked regolith-gnome.target; then
+        gnome_target_pre_masked=true
     else
-        echo "regolith-session: Sway IPC socket was not found; skipping COSMIC helper startup" >&2
+        mask_state_status=$?
+        if [ "$mask_state_status" -ne 1 ]; then
+            return 1
+        fi
     fi
-fi
 
-wait "$compositor_pid"
+    if regolith_legacy_target_is_pre_masked regolith-wayland.target; then
+        wayland_target_pre_masked=true
+    else
+        mask_state_status=$?
+        if [ "$mask_state_status" -ne 1 ]; then
+            return 1
+        fi
+    fi
+
+    if [ "$gnome_target_pre_masked" != true ]; then
+        if ! systemctl --user mask --runtime regolith-gnome.target; then
+            echo "regolith-session: failed to mask legacy Regolith targets; skipping COSMIC helper startup" >&2
+            return 1
+        fi
+        legacy_gnome_target_mask_owned=true
+    fi
+
+    if [ "$wayland_target_pre_masked" != true ]; then
+        if ! systemctl --user mask --runtime regolith-wayland.target; then
+            echo "regolith-session: failed to mask legacy Regolith targets; skipping COSMIC helper startup" >&2
+            unmask_regolith_legacy_targets_owned_by_cosmic
+            return 1
+        fi
+        legacy_wayland_target_mask_owned=true
+    fi
+
+    systemctl --user stop regolith-gnome.target || true
+    systemctl --user stop regolith-wayland.target || true
+}
+
+regolith_cosmic_runtime_stop_compositor() {
+    if [ -n "${compositor_pid:-}" ] && kill -0 "$compositor_pid" >/dev/null 2>&1; then
+        kill "$compositor_pid" >/dev/null 2>&1 || true
+    fi
+
+    if [ -n "${compositor_pid:-}" ]; then
+        wait "$compositor_pid" >/dev/null 2>&1 || true
+    fi
+}
+
+regolith_cosmic_runtime_abort_session() {
+    local status="$1"
+
+    regolith_cosmic_runtime_cleanup true
+    return "$status"
+}
+
+regolith_cosmic_runtime_on_exit() {
+    local status=$?
+
+    trap - EXIT INT TERM
+    regolith_cosmic_runtime_cleanup
+    exit "$status"
+}
+
+regolith_cosmic_runtime_main() {
+    "$@" &
+    compositor_pid=$!
+
+    if wait_for_regolith_cosmic_wayland_socket; then
+        if wait_for_regolith_cosmic_sway_socket; then
+            if kill -0 "$compositor_pid" >/dev/null 2>&1; then
+                systemctl --user import-environment SWAYSOCK
+
+                if systemctl --user is-active --quiet cosmic-session.target; then
+                    if ! mask_regolith_legacy_targets_for_cosmic; then
+                        echo "regolith-session: failed to isolate legacy Regolith targets; aborting COSMIC session" >&2
+                        regolith_cosmic_runtime_abort_session 1
+                        return $?
+                    fi
+                    if ! start_regolith_cosmic_helpers; then
+                        echo "regolith-session: failed to start COSMIC helpers; aborting session" >&2
+                        regolith_cosmic_runtime_abort_session 1
+                        return $?
+                    fi
+                else
+                    target_state_status=$?
+
+                    if [ "$target_state_status" -eq 3 ] && systemctl --user start cosmic-session.target; then
+                        target_started=true
+
+                        if kill -0 "$compositor_pid" >/dev/null 2>&1; then
+                            if ! mask_regolith_legacy_targets_for_cosmic; then
+                                echo "regolith-session: failed to isolate legacy Regolith targets; aborting COSMIC session" >&2
+                                regolith_cosmic_runtime_abort_session 1
+                                return $?
+                            fi
+                            if ! start_regolith_cosmic_helpers; then
+                                echo "regolith-session: failed to start COSMIC helpers; aborting session" >&2
+                                regolith_cosmic_runtime_abort_session 1
+                                return $?
+                            fi
+                        else
+                            echo "regolith-session: compositor exited after COSMIC target startup; stopping target and skipping helpers" >&2
+                            systemctl --user stop cosmic-session.target || true
+                            target_started=false
+                        fi
+                    else
+                        if [ "$target_state_status" -eq 3 ]; then
+                            echo "regolith-session: failed to start cosmic-session.target; skipping COSMIC helper startup" >&2
+                        else
+                            echo "regolith-session: failed to query cosmic-session.target state; skipping COSMIC helper startup" >&2
+                        fi
+                    fi
+                fi
+            else
+                echo "regolith-session: compositor exited before COSMIC readiness; skipping target startup" >&2
+            fi
+        else
+            echo "regolith-session: Sway IPC socket was not found; skipping COSMIC helper startup" >&2
+        fi
+    fi
+
+    set +e
+    wait "$compositor_pid"
+    compositor_status=$?
+    set -e
+
+    regolith_cosmic_runtime_cleanup
+
+    return "$compositor_status"
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    trap regolith_cosmic_runtime_on_exit EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    regolith_cosmic_runtime_main "$@"
+    exit $?
+fi

@@ -30,10 +30,18 @@ case "$*" in
     "--user import-environment SWAYSOCK")
         printf 'SWAYSOCK=%s\n' "$SWAYSOCK" >"$SWAY_MANAGER_ENV"
         ;;
-    "--user start regolith-cosmic.target")
+    "--user is-enabled regolith-gnome.target"|"--user is-enabled regolith-wayland.target")
+        printf 'disabled\n'
+        ;;
+    "--user is-active --quiet cosmic-session.target")
+        exit 3
+        ;;
+    "--user start cosmic-session.target")
         [ -f "$SWAY_MANAGER_ENV" ] || exit 1
         . "$SWAY_MANAGER_ENV"
         "$SWAY_TEST_FALLBACK"
+        ;;
+    "--user mask --runtime regolith-gnome.target"|"--user mask --runtime regolith-wayland.target"|"--user stop regolith-gnome.target"|"--user stop regolith-wayland.target"|"--user unmask regolith-gnome.target"|"--user unmask regolith-wayland.target"|"--user stop cosmic-session.target")
         ;;
     "--user unset-environment SWAYSOCK")
         rm -f "$SWAY_MANAGER_ENV"
@@ -42,7 +50,7 @@ esac
 EOF
 cat >"$TMP_DIR/compositor" <<'EOF'
 #!/bin/bash
-sleep 0.1
+sleep 1
 EOF
 cat >"$TMP_DIR/helpers" <<'EOF'
 #!/bin/bash
@@ -88,10 +96,19 @@ REGOLITH_COSMIC_SESSION_HELPERS="$TMP_DIR/helpers" "$RUNTIME" "$TMP_DIR/composit
 grep -Fqx 'swaymsg -t get_version' "$SWAY_TEST_LOG"
 grep -Fq -- 'gtklock' "$SWAY_TEST_LOG"
 import_line="$(grep -n 'systemctl --user import-environment SWAYSOCK' "$SWAY_TEST_LOG" | cut -d: -f1)"
-start_line="$(grep -n 'systemctl --user start regolith-cosmic.target' "$SWAY_TEST_LOG" | cut -d: -f1)"
+start_line="$(grep -n 'systemctl --user start cosmic-session.target' "$SWAY_TEST_LOG" | cut -d: -f1)"
 [ -n "$import_line" ] && [ -n "$start_line" ] && [ "$import_line" -lt "$start_line" ] || { echo "manager import did not precede target activation" >&2; exit 1; }
+grep -Fqx 'systemctl --user stop cosmic-session.target' "$SWAY_TEST_LOG"
+grep -Fqx 'systemctl --user mask --runtime regolith-gnome.target' "$SWAY_TEST_LOG"
+grep -Fqx 'systemctl --user mask --runtime regolith-wayland.target' "$SWAY_TEST_LOG"
+grep -Fqx 'systemctl --user unmask regolith-gnome.target' "$SWAY_TEST_LOG"
+grep -Fqx 'systemctl --user unmask regolith-wayland.target' "$SWAY_TEST_LOG"
 grep -Fqx 'systemctl --user unset-environment SWAYSOCK' "$SWAY_TEST_LOG"
 [ ! -e "$SWAY_MANAGER_ENV" ] || { echo "manager SWAYSOCK was not cleared" >&2; exit 1; }
+if grep -Fq 'systemctl --user start regolith-cosmic.target' "$SWAY_TEST_LOG"; then
+    echo "runtime bypassed cosmic-session.target activation" >&2
+    exit 1
+fi
 if grep -Eq 'cosmic-idle|regolith-init-powerd' "$SWAY_TEST_LOG"; then
     echo "native idle or power daemon was invoked" >&2
     exit 1
