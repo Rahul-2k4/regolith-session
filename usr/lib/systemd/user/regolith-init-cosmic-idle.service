@@ -1,10 +1,10 @@
 [Unit]
-Description=Regolith COSMIC idle and lock fallback
+Description=Regolith COSMIC native idle service
 After=cosmic-session.target
 PartOf=regolith-cosmic.target
 
 [Service]
 Type=simple
-ExecStart=/usr/lib/regolith/regolith-cosmic-idle-fallback
+ExecStart=/usr/bin/cosmic-idle
 Restart=on-failure
 RestartSec=1s
