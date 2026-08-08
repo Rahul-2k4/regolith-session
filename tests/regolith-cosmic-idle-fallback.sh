@@ -3,6 +3,7 @@ set -Eeu -o pipefail
 
 ROOT_DIR=$(cd "$(dirname "$0")/.." && pwd)
 FALLBACK="$ROOT_DIR/usr/lib/regolith/regolith-cosmic-idle-fallback"
+RUNTIME="$ROOT_DIR/usr/lib/regolith/regolith-session-cosmic-runtime"
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 mkdir -p "$TMP_DIR/bin"
@@ -22,10 +23,44 @@ cat >"$TMP_DIR/bin/gtklock" <<'EOF'
 #!/bin/bash
 printf 'gtklock %s\n' "$*" >>"$SWAY_TEST_LOG"
 EOF
+cat >"$TMP_DIR/bin/systemctl" <<'EOF'
+#!/bin/bash
+printf 'systemctl %s\n' "$*" >>"$SWAY_TEST_LOG"
+case "$*" in
+    "--user import-environment SWAYSOCK")
+        printf 'SWAYSOCK=%s\n' "$SWAYSOCK" >"$SWAY_MANAGER_ENV"
+        ;;
+    "--user start regolith-cosmic.target")
+        [ -f "$SWAY_MANAGER_ENV" ] || exit 1
+        . "$SWAY_MANAGER_ENV"
+        "$SWAY_TEST_FALLBACK"
+        ;;
+    "--user unset-environment SWAYSOCK")
+        rm -f "$SWAY_MANAGER_ENV"
+        ;;
+esac
+EOF
+cat >"$TMP_DIR/compositor" <<'EOF'
+#!/bin/bash
+sleep 0.1
+EOF
+cat >"$TMP_DIR/helpers" <<'EOF'
+#!/bin/bash
+wait_for_regolith_cosmic_wayland_socket() { return 0; }
+wait_for_regolith_cosmic_sway_socket() {
+    SWAYSOCK="$SWAY_TEST_SOCKET"
+    export SWAYSOCK
+    return 0
+}
+start_regolith_cosmic_helpers() { :; }
+EOF
 chmod +x "$TMP_DIR/bin/"*
+chmod +x "$TMP_DIR/compositor"
 SWAY_TEST_LOG="$TMP_DIR/log"
 SWAY_TEST_SOCKET="$TMP_DIR/sway.sock"
-export SWAY_TEST_LOG SWAY_TEST_SOCKET
+SWAY_MANAGER_ENV="$TMP_DIR/manager-environment"
+SWAY_TEST_FALLBACK="$FALLBACK"
+export SWAY_TEST_LOG SWAY_TEST_SOCKET SWAY_MANAGER_ENV SWAY_TEST_FALLBACK
 
 if SWAYSOCK="$TMP_DIR/missing.sock" "$FALLBACK"; then
     echo "missing SWAYSOCK unexpectedly started fallback" >&2
@@ -48,10 +83,15 @@ if SWAYSOCK="$SWAY_TEST_SOCKET" SWAY_TEST_STALE=1 "$FALLBACK"; then
     echo "stale SWAYSOCK unexpectedly started fallback" >&2
     exit 1
 fi
-SWAYSOCK="$SWAY_TEST_SOCKET" "$FALLBACK"
+REGOLITH_COSMIC_SESSION_HELPERS="$TMP_DIR/helpers" "$RUNTIME" "$TMP_DIR/compositor"
 [ "$(grep -c '^swayidle ' "$SWAY_TEST_LOG")" -eq 1 ] || { echo "expected one swayidle owner" >&2; exit 1; }
 grep -Fqx 'swaymsg -t get_version' "$SWAY_TEST_LOG"
 grep -Fq -- 'gtklock' "$SWAY_TEST_LOG"
+import_line="$(grep -n 'systemctl --user import-environment SWAYSOCK' "$SWAY_TEST_LOG" | cut -d: -f1)"
+start_line="$(grep -n 'systemctl --user start regolith-cosmic.target' "$SWAY_TEST_LOG" | cut -d: -f1)"
+[ -n "$import_line" ] && [ -n "$start_line" ] && [ "$import_line" -lt "$start_line" ] || { echo "manager import did not precede target activation" >&2; exit 1; }
+grep -Fqx 'systemctl --user unset-environment SWAYSOCK' "$SWAY_TEST_LOG"
+[ ! -e "$SWAY_MANAGER_ENV" ] || { echo "manager SWAYSOCK was not cleared" >&2; exit 1; }
 if grep -Eq 'cosmic-idle|regolith-init-powerd' "$SWAY_TEST_LOG"; then
     echo "native idle or power daemon was invoked" >&2
     exit 1

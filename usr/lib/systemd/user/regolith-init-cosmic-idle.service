@@ -1,6 +1,6 @@
 [Unit]
 Description=Regolith COSMIC idle and lock fallback
-After=cosmic-session.target regolith-cosmic.target
+After=cosmic-session.target
 PartOf=regolith-cosmic.target
 
 [Service]

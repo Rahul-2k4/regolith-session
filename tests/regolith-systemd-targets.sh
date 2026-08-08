@@ -25,7 +25,8 @@ has_line "$COSMIC_TARGET" "Wants=regolith-init-inputd.service regolith-init-disp
 if grep -Fqx "Wants=cosmic-session.target" "$COSMIC_TARGET"; then fail "COSMIC parent dependency cycle"; fi
 if grep -Fq "kanshi" "$COSMIC_TARGET"; then fail "COSMIC target pulls kanshi"; fi
 [ -f "$COSMIC_IDLE_SERVICE" ] || fail "COSMIC idle service is missing"
-has_line "$COSMIC_IDLE_SERVICE" "After=cosmic-session.target regolith-cosmic.target" || fail "COSMIC idle ordering is missing"
+has_line "$COSMIC_IDLE_SERVICE" "After=cosmic-session.target" || fail "COSMIC idle ordering is missing"
+if grep -Fq "After=regolith-cosmic.target" "$COSMIC_IDLE_SERVICE"; then fail "COSMIC idle service reverse-orders its owning target"; fi
 has_line "$COSMIC_IDLE_SERVICE" "PartOf=regolith-cosmic.target" || fail "COSMIC idle ownership is missing"
 has_line "$COSMIC_IDLE_SERVICE" "ExecStart=/usr/lib/regolith/regolith-cosmic-idle-fallback" || fail "COSMIC idle fallback is not the service command"
 if grep -Fq "ExecStart=cosmic-idle" "$COSMIC_IDLE_SERVICE"; then fail "COSMIC idle service invokes native cosmic-idle"; fi
@@ -38,6 +39,7 @@ has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/use
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/user/regolith-init-displayd.service.d/20-regolith-cosmic-session.conf" || fail "COSMIC displayd ordering drop-in is not packaged"
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/user/regolith-init-cosmic-idle.service" || fail "COSMIC idle service is not packaged"
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/regolith/regolith-cosmic-idle-fallback" || fail "COSMIC idle fallback is not packaged"
+has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/regolith/regolith-session-cosmic-runtime" || fail "COSMIC runtime wrapper is not packaged"
 if grep -Fq "regolith-init-inputd.service.d" "$ROOT_DIR/debian/regolith-session-sway.install"; then fail "GNOME package gained COSMIC inputd ordering"; fi
 if grep -Fq "regolith-init-displayd.service.d" "$ROOT_DIR/debian/regolith-session-sway.install"; then fail "GNOME package gained COSMIC displayd ordering"; fi
 has_line "$ROOT_DIR/debian/regolith-session-sway.install" "usr/lib/systemd/user/regolith-gnome.target" || fail "GNOME target is not packaged"

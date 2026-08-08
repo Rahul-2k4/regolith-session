@@ -1,0 +1,31 @@
+#!/bin/bash
+# Start Sway, publish its verified IPC socket to the user manager, and then
+# activate the target-owned COSMIC helpers.
+
+set -Eeu -o pipefail
+
+source "${REGOLITH_COSMIC_SESSION_HELPERS:-/usr/lib/regolith/regolith-session-cosmic.sh}"
+
+regolith_cosmic_runtime_cleanup() {
+    systemctl --user unset-environment SWAYSOCK || true
+    unset SWAYSOCK || true
+}
+
+trap regolith_cosmic_runtime_cleanup EXIT
+
+"$@" &
+compositor_pid=$!
+
+if wait_for_regolith_cosmic_wayland_socket; then
+    if wait_for_regolith_cosmic_sway_socket; then
+        if kill -0 "$compositor_pid" >/dev/null 2>&1; then
+            systemctl --user import-environment SWAYSOCK
+            systemctl --user start regolith-cosmic.target
+            start_regolith_cosmic_helpers
+        fi
+    else
+        echo "regolith-session: Sway IPC socket was not found; skipping COSMIC helper startup" >&2
+    fi
+fi
+
+wait "$compositor_pid"
