@@ -1,0 +1,24 @@
+#!/bin/bash
+
+set -Eeu -o pipefail
+
+if [ -z "${SWAYSOCK-}" ] || [ ! -S "$SWAYSOCK" ]; then
+    echo "regolith-cosmic-idle: SWAYSOCK is unavailable" >&2
+    exit 1
+fi
+
+if ! swaymsg -t get_version >/dev/null 2>&1; then
+    echo "regolith-cosmic-idle: Sway IPC is unavailable" >&2
+    exit 1
+fi
+
+command -v swayidle >/dev/null 2>&1 || {
+    echo "regolith-cosmic-idle: swayidle is unavailable" >&2
+    exit 1
+}
+command -v gtklock >/dev/null 2>&1 || {
+    echo "regolith-cosmic-idle: gtklock is unavailable" >&2
+    exit 1
+}
+
+exec swayidle -w timeout 300 gtklock

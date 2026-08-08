@@ -5,3 +5,4 @@ usr/share/wayland-sessions/regolith-cosmic.desktop
 usr/lib/systemd/user/regolith-cosmic.target
 usr/lib/systemd/user/regolith-init-cosmic-idle.service
 usr/lib/systemd/user/cosmic-session.target.d
+usr/lib/regolith/regolith-cosmic-idle-fallback
