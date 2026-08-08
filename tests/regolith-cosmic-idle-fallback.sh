@@ -16,9 +16,8 @@ if grep -Fq "ExecStart=/usr/bin/cosmic-idle" "$SERVICE"; then fail "default idle
 has_line "$SERVICE" "PartOf=regolith-cosmic.target" || fail "idle service is not stopped with the COSMIC target"
 has_line "$INSTALL" "usr/lib/systemd/user/regolith-init-cosmic-idle.service" || fail "fallback service is not packaged"
 has_line "$INSTALL" "usr/lib/regolith/regolith-cosmic-idle-fallback" || fail "fallback script is not packaged"
-has_line "$SERVICE" "PartOf=regolith-cosmic.target" || fail "idle service is not stopped with the COSMIC target"
-has_line "$INSTALL" "usr/lib/regolith/regolith-cosmic-idle-fallback" || fail "fallback script is not packaged"
-
+cosmic_control="$(sed -n '/^Package: regolith-session-cosmic$/,/^Package: /p' "$ROOT_DIR/debian/control")"
+if printf "%s\n" "$cosmic_control" | grep -Eq '^[[:space:]]+cosmic-idle,$'; then fail "default COSMIC package metadata pulls native cosmic-idle"; fi
 workdir=$(mktemp -d)
 trap 'rm -rf "$workdir"' EXIT
 bin_dir="$workdir/bin"

@@ -81,7 +81,6 @@ Package: regolith-session-cosmic
 Architecture: any
 Depends: ${misc:Depends},
     cosmic-session,
-    cosmic-idle,
     dbus,
     regolith-displayd,
     regolith-inputd,
@@ -98,7 +97,6 @@ Depends: ${misc:Depends},
     xwayland
 Recommends:
     cosmic-bg,
-    cosmic-idle,
     cosmic-osd,
     cosmic-settings,
     cosmic-settings-daemon,
