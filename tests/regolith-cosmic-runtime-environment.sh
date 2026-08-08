@@ -44,6 +44,7 @@ chmod +x "$stub_dir/bash"
 
 export PATH="$stub_dir:$PATH"
 export REGOLITH_COSMIC_TEST_LOG="$log_file"
+export XDG_CURRENT_DESKTOP="Regolith-Wayland:COSMIC:sway"
 export WAYLAND_DISPLAY=wayland-1
 export SWAYSOCK="$workdir/sway.sock"
 
@@ -68,12 +69,12 @@ line_number() {
     awk -v event="$event" '$0 == event { print NR; exit }' "$log_file"
 }
 
-import_line="$(line_number 'systemctl --user import-environment WAYLAND_DISPLAY SWAYSOCK')"
+import_line="$(line_number 'systemctl --user import-environment XDG_CURRENT_DESKTOP WAYLAND_DISPLAY SWAYSOCK')"
 restart_line="$(line_number 'systemctl --user restart regolith-cosmic.target')"
 start_line="$(line_number 'systemctl --user start cosmic-session.target')"
-unset_line="$(line_number 'systemctl --user unset-environment WAYLAND_DISPLAY SWAYSOCK')"
+unset_line="$(line_number 'systemctl --user unset-environment XDG_CURRENT_DESKTOP WAYLAND_DISPLAY SWAYSOCK')"
 
-[ -n "$import_line" ] || { echo "missing WAYLAND_DISPLAY and SWAYSOCK import" >&2; exit 1; }
+[ -n "$import_line" ] || { echo "missing XDG_CURRENT_DESKTOP, WAYLAND_DISPLAY, and SWAYSOCK import" >&2; exit 1; }
 [ -n "$restart_line" ] || { echo "missing COSMIC target reinitialization" >&2; exit 1; }
 [ -z "$start_line" ] || { echo "COSMIC target must be reinitialized, not merely started" >&2; exit 1; }
 [ -n "$unset_line" ] || { echo "missing WAYLAND_DISPLAY and SWAYSOCK cleanup" >&2; exit 1; }
