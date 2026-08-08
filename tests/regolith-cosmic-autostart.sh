@@ -266,8 +266,9 @@ fi
 
 rm -f "$log_file"
 REGOLITH_COSMIC_ENABLE_IDLE=true start_regolith_cosmic_helpers
+sleep 0.2
 
-if ! wait_for_log_entry 'cosmic-idle argc=0 args='; then
-    echo "expected cosmic-idle to autostart when enabled explicitly" >&2
+if [ -f "$log_file" ] && grep -qx 'cosmic-idle argc=0 args=' "$log_file"; then
+    echo "expected the session helper not to create a second idle owner" >&2
     exit 1
 fi

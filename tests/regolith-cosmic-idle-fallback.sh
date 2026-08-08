@@ -33,6 +33,9 @@ case "$*" in
     "--user is-enabled regolith-gnome.target"|"--user is-enabled regolith-wayland.target")
         printf 'disabled\n'
         ;;
+    "--user is-enabled regolith-init-powerd.service")
+        printf 'enabled\n'
+        ;;
     "--user is-active --quiet cosmic-session.target")
         exit 3
         ;;
@@ -42,6 +45,8 @@ case "$*" in
         "$SWAY_TEST_FALLBACK"
         ;;
     "--user mask --runtime regolith-gnome.target"|"--user mask --runtime regolith-wayland.target"|"--user stop regolith-gnome.target"|"--user stop regolith-wayland.target"|"--user unmask regolith-gnome.target"|"--user unmask regolith-wayland.target"|"--user stop cosmic-session.target")
+        ;;
+    "--user mask --runtime regolith-init-powerd.service"|"--user stop regolith-init-powerd.service"|"--user unmask regolith-init-powerd.service")
         ;;
     "--user unset-environment SWAYSOCK")
         rm -f "$SWAY_MANAGER_ENV"
@@ -109,8 +114,10 @@ if grep -Fq 'systemctl --user start regolith-cosmic.target' "$SWAY_TEST_LOG"; th
     echo "runtime bypassed cosmic-session.target activation" >&2
     exit 1
 fi
-if grep -Eq 'cosmic-idle|regolith-init-powerd' "$SWAY_TEST_LOG"; then
-    echo "native idle or power daemon was invoked" >&2
+if grep -Fq 'cosmic-idle' "$SWAY_TEST_LOG"; then
+    echo "native idle was invoked" >&2
     exit 1
 fi
+grep -Fqx 'systemctl --user mask --runtime regolith-init-powerd.service' "$SWAY_TEST_LOG"
+grep -Fqx 'systemctl --user stop regolith-init-powerd.service' "$SWAY_TEST_LOG"
 echo "COSMIC idle fallback: PASS"
