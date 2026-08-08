@@ -152,7 +152,7 @@ assert_runtime_waits_for_sway_socket_before_helpers() {
     local helper_line=
 
     sway_wait_line="$(grep -n 'if wait_for_regolith_cosmic_sway_socket' "$runtime_script" | cut -d: -f1)"
-    helper_line="$(    helper_line="$(grep -n 'start_regolith_cosmic_helpers' "$runtime_script" | head -n1 | cut -d: -f1)"
+    helper_line=""
 
     if [ -z "$sway_wait_line" ] || [ -z "$helper_line" ] || [ "$sway_wait_line" -ge "$helper_line" ]; then
         echo "expected runtime to discover Sway IPC before starting COSMIC helpers" >&2
