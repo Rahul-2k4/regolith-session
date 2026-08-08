@@ -1,0 +1,11 @@
+[Unit]
+Description=Regolith COSMIC idle and lock fallback
+After=cosmic-session.target regolith-cosmic.target
+PartOf=regolith-cosmic.target
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/regolith/regolith-cosmic-idle-fallback
+
+[Install]
+WantedBy=regolith-cosmic.target

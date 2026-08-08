@@ -1,0 +1,26 @@
+#!/bin/bash
+set -Eeu -o pipefail
+
+# Only trust the socket exported by the Sway launcher; guessing a socket can
+# attach the idle owner to another session or stale compositor.
+if [ -z "${SWAYSOCK-}" ] || [ ! -S "$SWAYSOCK" ]; then
+    echo "regolith-cosmic-idle: launcher-provided SWAYSOCK is unavailable" >&2
+    exit 1
+fi
+
+if ! swaymsg -t get_version >/dev/null 2>&1; then
+    echo "regolith-cosmic-idle: launcher-provided SWAYSOCK is stale" >&2
+    exit 1
+fi
+
+lock_program=gtklock
+if command -v trawlcat >/dev/null 2>&1; then
+    configured_lock="$(trawlcat wm.program.lock gtklock 2>/dev/null || true)"
+    if [ -n "$configured_lock" ] && command -v "$configured_lock" >/dev/null 2>&1; then
+        lock_program="$configured_lock"
+    fi
+fi
+
+command -v swayidle >/dev/null 2>&1 || exit 1
+command -v "$lock_program" >/dev/null 2>&1 || exit 1
+exec swayidle -w timeout 300 "$lock_program"
