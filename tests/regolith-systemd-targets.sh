@@ -39,8 +39,8 @@ has_line "$COSMIC_IDLE_SERVICE" "After=cosmic-session.target" || fail "COSMIC id
 has_line "$COSMIC_IDLE_SERVICE" "PartOf=regolith-cosmic.target" || fail "COSMIC idle service ownership is missing"
 has_line "$COSMIC_IDLE_SERVICE" "ExecStart=/usr/lib/regolith/regolith-cosmic-idle-fallback" || fail "COSMIC idle fallback is not selected"
 grep -Fq 'SWAYSOCK' "$COSMIC_RUNTIME" || fail "COSMIC runtime does not handle SWAYSOCK"
-grep -Fq 'import-environment SWAYSOCK' "$COSMIC_RUNTIME" || fail "COSMIC runtime does not import SWAYSOCK"
-grep -Fq 'unset-environment SWAYSOCK' "$COSMIC_RUNTIME" || fail "COSMIC runtime does not clean up SWAYSOCK"
+grep -Fq 'import-environment WAYLAND_DISPLAY SWAYSOCK' "$COSMIC_RUNTIME" || fail "COSMIC runtime does not import compositor environment"
+grep -Fq 'unset-environment WAYLAND_DISPLAY SWAYSOCK' "$COSMIC_RUNTIME" || fail "COSMIC runtime does not clean up compositor environment"
 grep -Fq 'swayidle' "$COSMIC_IDLE_FALLBACK" || fail "COSMIC idle fallback does not use swayidle"
 grep -Fq 'gtklock' "$COSMIC_IDLE_FALLBACK" || fail "COSMIC idle fallback does not use gtklock"
 if grep -Fq 'systemctl suspend' "$COSMIC_IDLE_FALLBACK"; then fail "COSMIC idle fallback owns suspend policy"; fi

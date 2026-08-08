@@ -31,7 +31,7 @@ regolith_cosmic_runtime_cleanup() {
         systemctl --user unmask regolith-wayland.target || true
     fi
 
-    systemctl --user unset-environment SWAYSOCK || true
+    systemctl --user unset-environment WAYLAND_DISPLAY SWAYSOCK || true
 }
 
 regolith_legacy_target_is_pre_masked() {
@@ -105,8 +105,8 @@ mask_regolith_legacy_targets_for_cosmic() {
 if wait_for_regolith_cosmic_wayland_socket; then
     if wait_for_regolith_cosmic_sway_socket; then
         if kill -0 "$compositor_pid" >/dev/null 2>&1; then
-            if ! systemctl --user import-environment SWAYSOCK; then
-                echo "regolith-session: failed to import SWAYSOCK into the user manager; skipping COSMIC helper startup" >&2
+            if ! systemctl --user import-environment WAYLAND_DISPLAY SWAYSOCK; then
+                echo "regolith-session: failed to import compositor environment into the user manager; skipping COSMIC helper startup" >&2
             elif systemctl --user is-active --quiet cosmic-session.target; then
                 if mask_regolith_legacy_targets_for_cosmic; then
                     start_regolith_cosmic_helpers

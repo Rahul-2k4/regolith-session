@@ -44,6 +44,7 @@ chmod +x "$stub_dir/bash"
 
 export PATH="$stub_dir:$PATH"
 export REGOLITH_COSMIC_TEST_LOG="$log_file"
+export WAYLAND_DISPLAY=wayland-1
 export SWAYSOCK="$workdir/sway.sock"
 
 python3 - "$SWAYSOCK" <<'PY' &
@@ -67,14 +68,14 @@ line_number() {
     awk -v event="$event" '$0 == event { print NR; exit }' "$log_file"
 }
 
-import_line="$(line_number 'systemctl --user import-environment SWAYSOCK')"
+import_line="$(line_number 'systemctl --user import-environment WAYLAND_DISPLAY SWAYSOCK')"
 start_line="$(line_number 'systemctl --user start cosmic-session.target')"
-unset_line="$(line_number 'systemctl --user unset-environment SWAYSOCK')"
+unset_line="$(line_number 'systemctl --user unset-environment WAYLAND_DISPLAY SWAYSOCK')"
 
-[ -n "$import_line" ] || { echo "missing SWAYSOCK import" >&2; exit 1; }
+[ -n "$import_line" ] || { echo "missing WAYLAND_DISPLAY and SWAYSOCK import" >&2; exit 1; }
 [ -n "$start_line" ] || { echo "missing COSMIC target start" >&2; exit 1; }
-[ -n "$unset_line" ] || { echo "missing SWAYSOCK cleanup" >&2; exit 1; }
-[ "$import_line" -lt "$start_line" ] || { echo "SWAYSOCK import must precede target start" >&2; exit 1; }
-[ "$start_line" -lt "$unset_line" ] || { echo "SWAYSOCK cleanup must follow target lifecycle" >&2; exit 1; }
+[ -n "$unset_line" ] || { echo "missing WAYLAND_DISPLAY and SWAYSOCK cleanup" >&2; exit 1; }
+[ "$import_line" -lt "$start_line" ] || { echo "compositor environment import must precede target start" >&2; exit 1; }
+[ "$start_line" -lt "$unset_line" ] || { echo "compositor environment cleanup must follow target lifecycle" >&2; exit 1; }
 
 echo "COSMIC runtime environment lifecycle: PASS"
