@@ -8,6 +8,7 @@ source "${REGOLITH_COSMIC_SESSION_HELPERS:-/usr/lib/regolith/regolith-session-co
 
 target_started=false
 compositor_pid=
+runtime_child_pids_file=
 legacy_gnome_target_mask_owned=false
 legacy_wayland_target_mask_owned=false
 legacy_powerd_mask_owned=false
@@ -48,6 +49,38 @@ unmask_regolith_legacy_targets_owned_by_cosmic() {
     fi
 }
 
+regolith_cosmic_runtime_stop_owned_helpers() {
+    local pid=
+
+    if [ -z "${runtime_child_pids_file:-}" ] || [ ! -f "$runtime_child_pids_file" ]; then
+        return 0
+    fi
+
+    while read -r pid; do
+        case "$pid" in
+            ''|*[!0-9]*)
+                continue
+                ;;
+        esac
+
+        if kill -0 "$pid" >/dev/null 2>&1; then
+            kill "$pid" >/dev/null 2>&1 || true
+        fi
+    done <"$runtime_child_pids_file"
+
+    while read -r pid; do
+        case "$pid" in
+            ''|*[!0-9]*)
+                continue
+                ;;
+        esac
+
+        wait "$pid" >/dev/null 2>&1 || true
+    done <"$runtime_child_pids_file"
+
+    rm -f "$runtime_child_pids_file"
+}
+
 regolith_cosmic_runtime_cleanup() {
     local force_target_stop="${1:-false}"
 
@@ -57,9 +90,11 @@ regolith_cosmic_runtime_cleanup() {
     fi
 
     regolith_cosmic_runtime_stop_compositor
+    regolith_cosmic_runtime_stop_owned_helpers
     unmask_regolith_legacy_targets_owned_by_cosmic
     systemctl --user unset-environment XDG_CURRENT_DESKTOP WAYLAND_DISPLAY SWAYSOCK || true
     unset SWAYSOCK || true
+    runtime_child_pids_file=
 }
 
 mask_regolith_legacy_targets_for_cosmic() {
@@ -159,6 +194,9 @@ regolith_cosmic_runtime_on_exit() {
 regolith_cosmic_runtime_main() {
     "$@" &
     compositor_pid=$!
+    runtime_child_pids_file="${XDG_RUNTIME_DIR:-/tmp}/regolith-cosmic-runtime-$$.pids"
+    : >"$runtime_child_pids_file"
+    export REGOLITH_COSMIC_RUNTIME_CHILD_PIDS_FILE="$runtime_child_pids_file"
 
     if wait_for_regolith_cosmic_wayland_socket; then
         if wait_for_regolith_cosmic_sway_socket; then

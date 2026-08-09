@@ -66,6 +66,15 @@ regolith_cosmic_configure_status_bar() {
     trawldb --merge "$override_file"
 }
 
+regolith_cosmic_register_runtime_child() {
+    local pid="$1"
+    local pid_file="${REGOLITH_COSMIC_RUNTIME_CHILD_PIDS_FILE:-}"
+
+    if [ -n "$pid_file" ]; then
+        printf '%s\n' "$pid" >>"$pid_file"
+    fi
+}
+
 regolith_cosmic_start_optional_process() {
     local program="$1"
     shift || true
@@ -79,6 +88,7 @@ regolith_cosmic_start_optional_process() {
     fi
 
     nohup "$program" "$@" >/dev/null 2>&1 &
+    regolith_cosmic_register_runtime_child "$!"
 }
 
 regolith_cosmic_start_optional_process_after() {
@@ -95,6 +105,7 @@ regolith_cosmic_start_optional_process_after() {
     fi
 
     nohup bash -c 'sleep "$1"; shift; exec "$@"' bash "$delay_seconds" "$program" "$@" >/dev/null 2>&1 &
+    regolith_cosmic_register_runtime_child "$!"
 }
 
 
