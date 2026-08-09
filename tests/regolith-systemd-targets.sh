@@ -24,7 +24,8 @@ if grep -Fqx "Wants=gnome-session.target" "$GNOME_TARGET"; then fail "GNOME pare
 has_line "$COSMIC_TARGET" "After=cosmic-session.target" || fail "COSMIC ordering is missing"
 has_line "$COSMIC_TARGET" "PartOf=cosmic-session.target" || fail "COSMIC ownership is missing"
 has_line "$COSMIC_TARGET" "Wants=regolith-init-inputd.service regolith-init-displayd.service" || fail "COSMIC helper Wants are incomplete"
-if grep -Eq '^\[Install\]$|^WantedBy=' "$COSMIC_TARGET"; then fail "COSMIC target must not declare package enablement"; fi
+if grep -Fqx "[Install]" "$COSMIC_TARGET"; then fail "COSMIC target must not declare package enablement"; fi
+if grep -Fqx "WantedBy=cosmic-session.target" "$COSMIC_TARGET"; then fail "COSMIC target must not be auto-enabled"; fi
 if grep -Fqx "Wants=cosmic-session.target" "$COSMIC_TARGET"; then fail "COSMIC parent dependency cycle"; fi
 if grep -Fq "kanshi" "$COSMIC_TARGET"; then fail "COSMIC target pulls kanshi"; fi
 
