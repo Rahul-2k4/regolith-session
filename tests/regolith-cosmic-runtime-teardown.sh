@@ -33,19 +33,34 @@ fi
 if [ "$2" = "is-enabled" ]; then
     echo disabled
 fi
+if [ "$2" = "import-environment" ] && [ -n "${REGOLITH_COSMIC_TEST_BLOCK_IMPORT:-}" ]; then
+    printf '%s\n' ready >"$REGOLITH_COSMIC_TEST_BLOCK_IMPORT"
+    sleep 1
+fi
 exit 0
 EOF
 chmod +x "$stub_dir/systemctl"
 
 cat >"$stub_dir/cosmolith" <<'EOF'
 #!/bin/bash
+sleep 30 &
+printf '%s\n' "$!" >"$REGOLITH_COSMIC_TEST_HELPER_DESCENDANT_PID"
 printf '%s\n' "$BASHPID" >"$REGOLITH_COSMIC_TEST_HELPER_PID"
 while :; do sleep 1; done
 EOF
 chmod +x "$stub_dir/cosmolith"
 
+cat >"$stub_dir/cosmic-osd" <<'EOF'
+#!/bin/bash
+printf '%s\n' "$BASHPID" >"$REGOLITH_COSMIC_TEST_DELAYED_HELPER_PID"
+while :; do sleep 1; done
+EOF
+chmod +x "$stub_dir/cosmic-osd"
+
 cat >"$stub_dir/sway" <<'EOF'
 #!/bin/bash
+sleep 30 &
+printf '%s\n' "$!" >"$REGOLITH_COSMIC_TEST_COMPOSITOR_DESCENDANT_PID"
 while :; do sleep 1; done
 EOF
 chmod +x "$stub_dir/sway"
@@ -53,7 +68,37 @@ chmod +x "$stub_dir/sway"
 export PATH="$stub_dir:$PATH"
 export XDG_RUNTIME_DIR="$runtime_dir"
 export REGOLITH_COSMIC_TEST_HELPER_PID="$workdir/helper.pid"
+export REGOLITH_COSMIC_TEST_HELPER_DESCENDANT_PID="$workdir/helper-descendant.pid"
+export REGOLITH_COSMIC_TEST_DELAYED_HELPER_PID="$workdir/delayed-helper.pid"
+export REGOLITH_COSMIC_TEST_COMPOSITOR_DESCENDANT_PID="$workdir/compositor-descendant.pid"
 export REGOLITH_COSMIC_SESSION_HELPERS="$helper_script"
+export REGOLITH_COSMIC_ENABLE_OSD=true
+export REGOLITH_COSMIC_OSD_DELAY_SECONDS=10
+
+export REGOLITH_COSMIC_TEST_BLOCK_IMPORT="$workdir/early-term.ready"
+"$ROOT_DIR/usr/lib/regolith/regolith-session-cosmic-runtime" sway >"$workdir/early-runtime.log" 2>&1 &
+early_runtime_pid="$!"
+for _ in $(seq 1 50); do
+    [ -e "$REGOLITH_COSMIC_TEST_BLOCK_IMPORT" ] && break
+    sleep 0.02
+done
+if [ ! -e "$REGOLITH_COSMIC_TEST_BLOCK_IMPORT" ]; then
+    echo "expected early teardown synchronization point" >&2
+    exit 1
+fi
+kill -TERM "$early_runtime_pid"
+early_status=0
+wait "$early_runtime_pid" 2>/dev/null || early_status="$?"
+if [ "$early_status" -ne 143 ]; then
+    echo "expected early TERM to preserve runtime status 143, got $early_status" >&2
+    exit 1
+fi
+if [ ! -s "$REGOLITH_COSMIC_TEST_COMPOSITOR_DESCENDANT_PID" ] ||
+    kill -0 "$(cat "$REGOLITH_COSMIC_TEST_COMPOSITOR_DESCENDANT_PID")" >/dev/null 2>&1; then
+    echo "expected early teardown to stop compositor descendants" >&2
+    exit 1
+fi
+unset REGOLITH_COSMIC_TEST_BLOCK_IMPORT
 
 "$ROOT_DIR/usr/lib/regolith/regolith-session-cosmic-runtime" sway >"$workdir/runtime.log" 2>&1 &
 runtime_pid="$!"
@@ -71,7 +116,7 @@ if [ ! -s "$workdir/helper.pid" ]; then
 fi
 
 helper_pid="$(cat "$workdir/helper.pid")"
-printf '%s\n' "$runtime_pid" "$helper_pid" >"$workdir/pids"
+printf '%s\n' "$runtime_pid" "$helper_pid" "$(cat "$REGOLITH_COSMIC_TEST_HELPER_DESCENDANT_PID")" >"$workdir/pids"
 kill -TERM "$runtime_pid"
 runtime_status=0
 wait "$runtime_pid" 2>/dev/null || runtime_status="$?"
@@ -83,5 +128,15 @@ fi
 
 if kill -0 "$helper_pid" >/dev/null 2>&1; then
     echo "expected runtime teardown to stop owned COSMIC helper" >&2
+    exit 1
+fi
+
+if kill -0 "$(cat "$REGOLITH_COSMIC_TEST_HELPER_DESCENDANT_PID")" >/dev/null 2>&1; then
+    echo "expected runtime teardown to stop helper descendants" >&2
+    exit 1
+fi
+
+if [ -s "$REGOLITH_COSMIC_TEST_DELAYED_HELPER_PID" ]; then
+    echo "expected delayed helper not to start before teardown" >&2
     exit 1
 fi

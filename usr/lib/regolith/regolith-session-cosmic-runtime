@@ -8,7 +8,6 @@ source "${REGOLITH_COSMIC_SESSION_HELPERS:-/usr/lib/regolith/regolith-session-co
 
 target_started=false
 compositor_pid=
-runtime_child_pids_file=
 legacy_gnome_target_mask_owned=false
 legacy_wayland_target_mask_owned=false
 legacy_powerd_mask_owned=false
@@ -49,36 +48,25 @@ unmask_regolith_legacy_targets_owned_by_cosmic() {
     fi
 }
 
-regolith_cosmic_runtime_stop_owned_helpers() {
-    local pid=
+regolith_cosmic_runtime_stop_process_group() {
+    local pid="$1"
 
-    if [ -z "${runtime_child_pids_file:-}" ] || [ ! -f "$runtime_child_pids_file" ]; then
+    if [ -z "$pid" ]; then
         return 0
     fi
 
-    while read -r pid; do
-        case "$pid" in
-            ''|*[!0-9]*)
-                continue
-                ;;
-        esac
+    kill -- "-$pid" >/dev/null 2>&1 || true
+    wait "$pid" >/dev/null 2>&1 || true
+}
 
-        if kill -0 "$pid" >/dev/null 2>&1; then
-            kill "$pid" >/dev/null 2>&1 || true
+regolith_cosmic_runtime_stop_owned_helpers() {
+    local pid=
+
+    for pid in $(jobs -pr); do
+        if [ "$pid" != "${compositor_pid:-}" ]; then
+            regolith_cosmic_runtime_stop_process_group "$pid"
         fi
-    done <"$runtime_child_pids_file"
-
-    while read -r pid; do
-        case "$pid" in
-            ''|*[!0-9]*)
-                continue
-                ;;
-        esac
-
-        wait "$pid" >/dev/null 2>&1 || true
-    done <"$runtime_child_pids_file"
-
-    rm -f "$runtime_child_pids_file"
+    done
 }
 
 regolith_cosmic_runtime_cleanup() {
@@ -94,7 +82,6 @@ regolith_cosmic_runtime_cleanup() {
     unmask_regolith_legacy_targets_owned_by_cosmic
     systemctl --user unset-environment XDG_CURRENT_DESKTOP WAYLAND_DISPLAY SWAYSOCK || true
     unset SWAYSOCK || true
-    runtime_child_pids_file=
 }
 
 mask_regolith_legacy_targets_for_cosmic() {
@@ -168,7 +155,7 @@ mask_regolith_legacy_targets_for_cosmic() {
 
 regolith_cosmic_runtime_stop_compositor() {
     if [ -n "${compositor_pid:-}" ] && kill -0 "$compositor_pid" >/dev/null 2>&1; then
-        kill "$compositor_pid" >/dev/null 2>&1 || true
+        regolith_cosmic_runtime_stop_process_group "$compositor_pid"
     fi
 
     if [ -n "${compositor_pid:-}" ]; then
@@ -192,11 +179,8 @@ regolith_cosmic_runtime_on_exit() {
 }
 
 regolith_cosmic_runtime_main() {
-    "$@" &
+    setsid -- "$@" &
     compositor_pid=$!
-    runtime_child_pids_file="${XDG_RUNTIME_DIR:-/tmp}/regolith-cosmic-runtime-$$.pids"
-    : >"$runtime_child_pids_file"
-    export REGOLITH_COSMIC_RUNTIME_CHILD_PIDS_FILE="$runtime_child_pids_file"
 
     if wait_for_regolith_cosmic_wayland_socket; then
         if wait_for_regolith_cosmic_sway_socket; then
