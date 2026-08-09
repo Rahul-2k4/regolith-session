@@ -3,6 +3,3 @@ Description=Regolith COSMIC session helpers
 After=cosmic-session.target
 PartOf=cosmic-session.target
 Wants=regolith-init-inputd.service regolith-init-displayd.service
-
-[Install]
-WantedBy=cosmic-session.target
