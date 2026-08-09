@@ -22,8 +22,11 @@ sway_wait_sleep_line="$(grep -nF 'sleep 0.1' "$LAUNCHER" | cut -d: -f1)"
 sway_wait_call_line="$(grep -nF 'if ! regolith_cosmic_wait_for_sway_socket; then' "$LAUNCHER" | cut -d: -f1)"
 sway_environment_line="$(grep -nF 'systemctl --user set-environment SWAYSOCK="$SWAYSOCK"' "$LAUNCHER" | cut -d: -f1)"
 start_target_line="$(grep -nF 'systemctl --user start cosmic-session.target' "$LAUNCHER" | cut -d: -f1)"
-target_status_line="$(grep -nF 'target_status=$?' "$LAUNCHER" | cut -d: -f1)"
+start_regolith_target_line="$(grep -nF 'systemctl --user start regolith-cosmic.target' "$LAUNCHER" | cut -d: -f1)"
+target_status_line="$(grep -nE '^target_status=\$\?$' "$LAUNCHER" | cut -d: -f1)"
 target_failure_line="$(grep -nF 'if [ "$target_status" -ne 0 ]' "$LAUNCHER" | cut -d: -f1)"
+regolith_target_status_line="$(grep -nF 'regolith_target_status=$?' "$LAUNCHER" | cut -d: -f1)"
+regolith_target_failure_line="$(grep -nF 'if [ "$regolith_target_status" -ne 0 ]' "$LAUNCHER" | cut -d: -f1)"
 abort_lines="$(grep -nF 'regolith_cosmic_abort_session "$session_pid"' "$LAUNCHER" | cut -d: -f1)"
 normal_wait_line="$(grep -nF 'wait "$session_pid"' "$LAUNCHER" | tail -n1 | cut -d: -f1)"
 stop_target_line="$(grep -nF 'systemctl --user stop cosmic-session.target' "$LAUNCHER" | tail -n1 | cut -d: -f1)"
@@ -33,7 +36,7 @@ set_nonzero_line="$(grep -nF 'set +e' "$LAUNCHER" | cut -d: -f1)"
 [ -n "$set_environment_line" ] && [ -n "$set_nonzero_line" ] && [ -n "$launch_line" ]
 [ -n "$sway_wait_function_line" ] && [ -n "$sway_wait_timeout_line" ] && [ -n "$sway_wait_loop_line" ]
 [ -n "$sway_wait_child_line" ] && [ -n "$sway_socket_glob_line" ] && [ -n "$sway_probe_line" ] && [ -n "$sway_wait_sleep_line" ] && [ -n "$sway_wait_call_line" ] && [ -n "$sway_environment_line" ]
-[ -n "$alive_line" ] && [ -n "$start_target_line" ] && [ -n "$target_status_line" ] && [ -n "$target_failure_line" ]
+[ -n "$alive_line" ] && [ -n "$start_target_line" ] && [ -n "$start_regolith_target_line" ] && [ -n "$target_status_line" ] && [ -n "$target_failure_line" ] && [ -n "$regolith_target_status_line" ] && [ -n "$regolith_target_failure_line" ]
 [ -n "$abort_lines" ] && [ -n "$normal_wait_line" ] && [ -n "$stop_target_line" ] && [ -n "$unset_call_line" ] && [ -n "$exit_status_line" ]
 [ "$set_environment_line" -lt "$launch_line" ]
 [ "$set_nonzero_line" -lt "$launch_line" ]
@@ -49,8 +52,12 @@ set_nonzero_line="$(grep -nF 'set +e' "$LAUNCHER" | cut -d: -f1)"
 [ "$sway_wait_call_line" -lt "$sway_environment_line" ]
 [ "$sway_environment_line" -lt "$start_target_line" ]
 [ "$alive_line" -lt "$start_target_line" ]
-[ "$start_target_line" -lt "$target_status_line" ]
+[ "$start_target_line" -lt "$start_regolith_target_line" ]
+[ "$sway_environment_line" -lt "$start_regolith_target_line" ]
 [ "$target_status_line" -lt "$target_failure_line" ]
+[ "$target_failure_line" -lt "$start_regolith_target_line" ]
+[ "$start_regolith_target_line" -lt "$regolith_target_status_line" ]
+[ "$regolith_target_status_line" -lt "$regolith_target_failure_line" ]
 [ "$normal_wait_line" -lt "$stop_target_line" ]
 [ "$stop_target_line" -lt "$unset_call_line" ]
 [ "$unset_call_line" -lt "$exit_status_line" ]
@@ -66,6 +73,7 @@ grep -Fq 'wait "$pid"' "$LAUNCHER"
 grep -Fq 'systemctl --user stop cosmic-session.target' "$LAUNCHER"
 grep -Fq 'systemctl --user unset-environment XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP DESKTOP_SESSION SWAYSOCK' "$LAUNCHER"
 grep -Fq 'systemctl --user set-environment SWAYSOCK="$SWAYSOCK"' "$LAUNCHER"
+grep -Fq 'systemctl --user start regolith-cosmic.target' "$LAUNCHER"
 grep -Fq 'timeout 1s swaymsg -t get_version' "$LAUNCHER"
 ! grep -Fq 'exec dbus-run-session -- /usr/bin/cosmic-session' "$LAUNCHER"
 ! grep -Fq 'exec cosmic-session "${sway_command[@]}"' "$LAUNCHER"

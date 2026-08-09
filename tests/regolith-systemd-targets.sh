@@ -14,8 +14,7 @@ has_line() { grep -Fqx "$2" "$1"; }
 
 [ -f "$GNOME_TARGET" ] || fail "missing GNOME target"
 [ -f "$COSMIC_TARGET" ] || fail "missing COSMIC target"
-[ -L "$COSMIC_WANTS_LINK" ] || fail "missing COSMIC vendor wants symlink"
-[ "$(readlink "$COSMIC_WANTS_LINK")" = "../regolith-cosmic.target" ] || fail "COSMIC vendor wants symlink target is incorrect"
+[ ! -e "$COSMIC_WANTS_LINK" ] || fail "COSMIC target must not use vendor wants activation"
 has_line "$GNOME_TARGET" "After=gnome-session.target" || fail "GNOME ordering is missing"
 has_line "$GNOME_TARGET" "PartOf=gnome-session.target" || fail "GNOME ownership is missing"
 has_line "$GNOME_TARGET" "WantedBy=gnome-session.target" || fail "GNOME install wiring is missing"
@@ -39,7 +38,7 @@ for dropin in "$COSMIC_INPUTD_DROPIN" "$COSMIC_DISPLAYD_DROPIN"; do
     if grep -Eq '^Environment=' "$dropin"; then fail "COSMIC drop-in hardcodes shared service environment"; fi
 done
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/user/regolith-cosmic.target" || fail "COSMIC target is not packaged"
-has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/user/cosmic-session.target.wants/regolith-cosmic.target" || fail "COSMIC vendor wants symlink is not packaged"
+if grep -Fq "usr/lib/systemd/user/cosmic-session.target.wants/regolith-cosmic.target" "$ROOT_DIR/debian/regolith-session-cosmic.install"; then fail "COSMIC package still installs vendor wants activation"; fi
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/user/regolith-init-inputd.service.d/20-regolith-cosmic-session.conf" || fail "COSMIC inputd drop-in is not packaged"
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/user/regolith-init-displayd.service.d/20-regolith-cosmic-session.conf" || fail "COSMIC displayd drop-in is not packaged"
 has_line "$ROOT_DIR/debian/regolith-session-sway.install" "usr/lib/systemd/user/regolith-gnome.target" || fail "GNOME target is not packaged"

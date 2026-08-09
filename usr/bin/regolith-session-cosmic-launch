@@ -147,6 +147,14 @@ if [ "$target_status" -ne 0 ]; then
     exit "$target_status"
 fi
 
+systemctl --user start regolith-cosmic.target
+regolith_target_status=$?
+if [ "$regolith_target_status" -ne 0 ]; then
+    regolith_cosmic_abort_session "$session_pid"
+    set -e
+    exit "$regolith_target_status"
+fi
+
 wait "$session_pid"
 session_status=$?
 systemctl --user stop cosmic-session.target >/dev/null 2>&1 || true
