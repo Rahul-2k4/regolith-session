@@ -23,6 +23,23 @@ paths_overlap() {
   local first=$1 second=$2
   [[ "$first" == "$second" || "$first" == "$second"/* || "$second" == "$first"/* ]]
 }
+validate_install_manifest() {
+  local install_file=$1 line_number=0 raw_line entry
+  while IFS= read -r raw_line || [ -n "$raw_line" ]; do
+    line_number=$((line_number + 1))
+    entry=$(trim_install_path "$raw_line")
+    case "$entry" in
+      ""|\#*) continue ;;
+    esac
+    if [[ "$entry" == *'*'* || "$entry" == *'?'* || "$entry" == *'['* || "$entry" == *']'* ]]; then
+      fail "unsupported wildcard syntax in $(basename "$install_file"):$line_number"
+    fi
+    case "$entry" in
+      -*|*\\*) fail "unsupported dh_install syntax in $(basename "$install_file"):$line_number" ;;
+      *[[:space:]]*) fail "source/destination syntax is not supported in $(basename "$install_file"):$line_number" ;;
+    esac
+  done < "$install_file"
+}
 
 [ -f "$GNOME_TARGET" ] || fail "missing GNOME target"
 [ -f "$COSMIC_TARGET" ] || fail "missing COSMIC target"
@@ -69,6 +86,10 @@ cosmic_only_paths=(
   usr/lib/systemd/user/cosmic-session.target.d
   usr/lib/regolith/regolith-cosmic-idle-fallback
 )
+for install_file in "$ROOT_DIR"/debian/regolith-session-*.install; do
+  [ -f "$install_file" ] || continue
+  validate_install_manifest "$install_file"
+done
 for cosmic_path in "${cosmic_only_paths[@]}"; do
   exactly_once "$ROOT_DIR/debian/regolith-session-cosmic.install" "$cosmic_path" \
     || fail "COSMIC artifact is not owned exactly once by session-cosmic: $cosmic_path"
