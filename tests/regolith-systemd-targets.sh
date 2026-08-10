@@ -75,21 +75,18 @@ has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/use
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/user/cosmic-session.target.d" || fail "COSMIC parent drop-in is not packaged"
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/user/regolith-init-cosmic-idle.service" || fail "COSMIC idle service is not packaged"
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/regolith/regolith-session-cosmic-runtime" || fail "COSMIC runtime is not packaged"
-cosmic_only_paths=(
-  usr/bin/regolith-session-cosmic-launch
-  usr/share/man/man1/regolith-session-cosmic-launch.1
-  usr/lib/regolith/regolith-session-cosmic.sh
-  usr/lib/regolith/regolith-session-cosmic-runtime
-  usr/share/wayland-sessions/regolith-cosmic.desktop
-  usr/lib/systemd/user/regolith-cosmic.target
-  usr/lib/systemd/user/regolith-init-cosmic-idle.service
-  usr/lib/systemd/user/cosmic-session.target.d
-  usr/lib/regolith/regolith-cosmic-idle-fallback
-)
 for install_file in "$ROOT_DIR"/debian/regolith-session-*.install; do
   [ -f "$install_file" ] || continue
   validate_install_manifest "$install_file"
 done
+cosmic_only_paths=()
+while IFS= read -r raw_line || [ -n "$raw_line" ]; do
+  cosmic_path=$(trim_install_path "$raw_line")
+  case "$cosmic_path" in
+    ""|\#*) continue ;;
+  esac
+  cosmic_only_paths+=("$cosmic_path")
+done < "$ROOT_DIR/debian/regolith-session-cosmic.install"
 for cosmic_path in "${cosmic_only_paths[@]}"; do
   exactly_once "$ROOT_DIR/debian/regolith-session-cosmic.install" "$cosmic_path" \
     || fail "COSMIC artifact is not owned exactly once by session-cosmic: $cosmic_path"
