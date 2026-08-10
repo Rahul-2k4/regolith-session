@@ -23,6 +23,7 @@ mock_parent_executable() {
         501) printf '%s\n' cosmic-session ;;
         502) printf '%s\n' unrelated-parent ;;
         503) printf '%s\n' dbus-run-session ;;
+        504) return 1 ;; # unreadable /proc/<pid>/exe
         *) return 1 ;;
     esac
 }
@@ -64,6 +65,13 @@ regolith_cosmic_runtime_parent_start_pid() { printf '%s\n' 502; }
 regolith_cosmic_runtime_terminate_owned_parent
 [ -z "$signal_log" ] || {
     echo "expected arbitrary parent teardown to be a no-op" >&2
+    exit 1
+}
+signal_log=""
+regolith_cosmic_runtime_parent_start_pid() { printf '%s\n' 504; }
+regolith_cosmic_runtime_terminate_owned_parent
+[ -z "$signal_log" ] || {
+    echo "expected unreadable ancestry teardown to be a no-op" >&2
     exit 1
 }
 unset -f kill
