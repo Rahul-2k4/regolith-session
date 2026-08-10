@@ -12,6 +12,17 @@ COSMIC_RUNTIME="$ROOT_DIR/usr/lib/regolith/regolith-session-cosmic-runtime"
 fail() { echo "systemd target test: $*" >&2; exit 1; }
 has_line() { grep -Fqx "$2" "$1"; }
 exactly_once() { [ "$(grep -Fxc "$2" "$1")" -eq 1 ]; }
+trim_install_path() {
+  local path=$1
+  path="${path#"${path%%[![:space:]]*}"}"
+  path="${path%"${path##*[![:space:]]}"}"
+  while [[ "$path" == */ ]]; do path=${path%/}; done
+  printf '%s\n' "$path"
+}
+paths_overlap() {
+  local first=$1 second=$2
+  [[ "$first" == "$second" || "$first" == "$second"/* || "$second" == "$first"/* ]]
+}
 
 [ -f "$GNOME_TARGET" ] || fail "missing GNOME target"
 [ -f "$COSMIC_TARGET" ] || fail "missing COSMIC target"
@@ -61,14 +72,20 @@ cosmic_only_paths=(
 for cosmic_path in "${cosmic_only_paths[@]}"; do
   exactly_once "$ROOT_DIR/debian/regolith-session-cosmic.install" "$cosmic_path" \
     || fail "COSMIC artifact is not owned exactly once by session-cosmic: $cosmic_path"
-  for install_file in \
-    "$ROOT_DIR/debian/regolith-session-common.install" \
-    "$ROOT_DIR/debian/regolith-session-flashback.install" \
-    "$ROOT_DIR/debian/regolith-session-flashback-ext.install" \
-    "$ROOT_DIR/debian/regolith-session-sway.install"; do
-    if has_line "$install_file" "$cosmic_path"; then
-      fail "COSMIC-only artifact is also owned by $(basename "$install_file"): $cosmic_path"
-    fi
+  for install_file in "$ROOT_DIR"/debian/regolith-session-*.install; do
+    [ -f "$install_file" ] || continue
+    case "$install_file" in
+      *regolith-session-cosmic.install) continue ;;
+    esac
+    while IFS= read -r sibling_path || [ -n "$sibling_path" ]; do
+      sibling_path=$(trim_install_path "$sibling_path")
+      case "$sibling_path" in
+        ""|\#*) continue ;;
+      esac
+      if paths_overlap "$cosmic_path" "$sibling_path"; then
+        fail "COSMIC-only artifact overlaps $(basename "$install_file"): $cosmic_path / $sibling_path"
+      fi
+    done < "$install_file"
   done
 done
 cosmic_control="$(sed -n '/^Package: regolith-session-cosmic$/,/^Package: /p' "$ROOT_DIR/debian/control")"
