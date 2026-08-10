@@ -69,6 +69,51 @@ regolith_cosmic_runtime_stop_owned_helpers() {
     done
 }
 
+regolith_cosmic_runtime_parent_pid() {
+    awk '{ print $4 }' "/proc/$1/stat" 2>/dev/null
+}
+
+regolith_cosmic_runtime_parent_executable() {
+    local pid="$1"
+    local executable=
+
+    executable="$(readlink -f "/proc/$pid/exe" 2>/dev/null || true)"
+    [ -n "$executable" ] || return 1
+    basename "$executable"
+}
+
+regolith_cosmic_runtime_parent_start_pid() {
+    printf '%s\n' "${PPID:-1}"
+}
+
+regolith_cosmic_runtime_find_owned_parent() {
+    local pid="$(regolith_cosmic_runtime_parent_start_pid)"
+    local executable=
+
+    while [ "$pid" -gt 1 ] 2>/dev/null; do
+        executable="$(regolith_cosmic_runtime_parent_executable "$pid" || true)"
+        case "$executable" in
+            cosmic-session|dbus-run-session)
+                printf '%s\n' "$pid"
+                return 0
+                ;;
+        esac
+        pid="$(regolith_cosmic_runtime_parent_pid "$pid" || true)"
+        [ -n "$pid" ] || return 1
+    done
+
+    return 1
+}
+
+regolith_cosmic_runtime_terminate_owned_parent() {
+    local parent_pid=
+
+    parent_pid="$(regolith_cosmic_runtime_find_owned_parent || true)"
+    if [ -n "$parent_pid" ]; then
+        kill -TERM "$parent_pid" >/dev/null 2>&1 || true
+    fi
+}
+
 regolith_cosmic_runtime_cleanup() {
     local force_target_stop="${1:-false}"
 
@@ -247,6 +292,7 @@ regolith_cosmic_runtime_main() {
     set -e
 
     regolith_cosmic_runtime_cleanup
+    regolith_cosmic_runtime_terminate_owned_parent
 
     return "$compositor_status"
 }

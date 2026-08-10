@@ -16,6 +16,59 @@ cleanup() {
 }
 trap cleanup EXIT
 
+export REGOLITH_COSMIC_SESSION_HELPERS="$ROOT_DIR/usr/lib/regolith/regolith-session-cosmic.sh"
+source "$ROOT_DIR/usr/lib/regolith/regolith-session-cosmic-runtime"
+mock_parent_executable() {
+    case "$1" in
+        501) printf '%s\n' cosmic-session ;;
+        502) printf '%s\n' unrelated-parent ;;
+        503) printf '%s\n' dbus-run-session ;;
+        *) return 1 ;;
+    esac
+}
+mock_parent_pid() {
+    case "$1" in
+        501) printf '%s\n' 503 ;;
+        502) printf '%s\n' 1 ;;
+        503) printf '%s\n' 1 ;;
+        *) return 1 ;;
+    esac
+}
+regolith_cosmic_runtime_parent_executable() { mock_parent_executable "$1"; }
+regolith_cosmic_runtime_parent_pid() { mock_parent_pid "$1"; }
+regolith_cosmic_runtime_parent_start_pid() { printf '%s\n' 501; }
+[ "$(regolith_cosmic_runtime_find_owned_parent)" = 501 ] || {
+    echo "expected exact cosmic-session ancestry to be accepted" >&2
+    exit 1
+}
+regolith_cosmic_runtime_parent_start_pid() { printf '%s\n' 502; }
+if regolith_cosmic_runtime_find_owned_parent >/dev/null; then
+    echo "expected arbitrary parent ancestry to be rejected" >&2
+    exit 1
+fi
+regolith_cosmic_runtime_parent_start_pid() { printf '%s\n' 503; }
+[ "$(regolith_cosmic_runtime_find_owned_parent)" = 503 ] || {
+    echo "expected exact dbus-run-session ancestry to be accepted" >&2
+    exit 1
+}
+signal_log=""
+kill() { signal_log="$*"; }
+regolith_cosmic_runtime_parent_start_pid() { printf '%s\n' 501; }
+regolith_cosmic_runtime_terminate_owned_parent
+[ "$signal_log" = "-TERM 501" ] || {
+    echo "expected only the verified COSMIC parent to receive TERM" >&2
+    exit 1
+}
+signal_log=""
+regolith_cosmic_runtime_parent_start_pid() { printf '%s\n' 502; }
+regolith_cosmic_runtime_terminate_owned_parent
+[ -z "$signal_log" ] || {
+    echo "expected arbitrary parent teardown to be a no-op" >&2
+    exit 1
+}
+unset -f kill
+unset -f regolith_cosmic_runtime_parent_executable regolith_cosmic_runtime_parent_pid regolith_cosmic_runtime_parent_start_pid
+
 stub_dir="$workdir/bin"
 runtime_dir="$workdir/runtime"
 mkdir -p "$stub_dir" "$runtime_dir/regolith-cosmic"
@@ -74,6 +127,11 @@ export REGOLITH_COSMIC_TEST_COMPOSITOR_DESCENDANT_PID="$workdir/compositor-desce
 export REGOLITH_COSMIC_SESSION_HELPERS="$helper_script"
 export REGOLITH_COSMIC_ENABLE_OSD=true
 export REGOLITH_COSMIC_OSD_DELAY_SECONDS=10
+
+# Cleanup is deliberately safe to repeat because the runtime's EXIT trap calls
+# it after the normal compositor-exit path has already cleaned up.
+regolith_cosmic_runtime_cleanup
+regolith_cosmic_runtime_cleanup
 
 export REGOLITH_COSMIC_TEST_BLOCK_IMPORT="$workdir/early-term.ready"
 "$ROOT_DIR/usr/lib/regolith/regolith-session-cosmic-runtime" sway >"$workdir/early-runtime.log" 2>&1 &
