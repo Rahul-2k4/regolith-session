@@ -11,6 +11,7 @@ compositor_pid=
 legacy_gnome_target_mask_owned=false
 legacy_wayland_target_mask_owned=false
 legacy_powerd_mask_owned=false
+cosmic_parent_termination_attempted=false
 
 regolith_legacy_target_is_pre_masked() {
     local target="$1"
@@ -70,7 +71,29 @@ regolith_cosmic_runtime_stop_owned_helpers() {
 }
 
 regolith_cosmic_runtime_parent_pid() {
-    awk '{ print $4 }' "/proc/$1/stat" 2>/dev/null
+    regolith_cosmic_runtime_parse_parent_pid "$1"
+}
+
+regolith_cosmic_runtime_parse_parent_pid() {
+    local stat=
+    local prefix=
+    local fields=
+    local state=
+    local parent_pid=
+
+    stat="$(cat "/proc/$1/stat" 2>/dev/null || true)"
+    [ -n "$stat" ] || return 1
+
+    prefix="${stat%)*}"
+    [ "$prefix" != "$stat" ] || return 1
+    fields="${stat:${#prefix}+1}"
+    read -r state parent_pid _ <<<"$fields"
+    [ -n "$state" ] || return 1
+    case "$parent_pid" in
+        ''|*[!0-9]*) return 1 ;;
+    esac
+
+    printf '%s\n' "$parent_pid"
 }
 
 regolith_cosmic_runtime_parent_executable() {
@@ -108,6 +131,11 @@ regolith_cosmic_runtime_find_owned_parent() {
 regolith_cosmic_runtime_terminate_owned_parent() {
     local parent_pid=
 
+    if [ "$cosmic_parent_termination_attempted" = true ]; then
+        return 0
+    fi
+    cosmic_parent_termination_attempted=true
+
     parent_pid="$(regolith_cosmic_runtime_find_owned_parent || true)"
     if [ -n "$parent_pid" ]; then
         kill -TERM "$parent_pid" >/dev/null 2>&1 || true
@@ -127,6 +155,7 @@ regolith_cosmic_runtime_cleanup() {
     unmask_regolith_legacy_targets_owned_by_cosmic
     systemctl --user unset-environment XDG_CURRENT_DESKTOP WAYLAND_DISPLAY SWAYSOCK || true
     unset SWAYSOCK || true
+    regolith_cosmic_runtime_terminate_owned_parent
 }
 
 mask_regolith_legacy_targets_for_cosmic() {
@@ -292,7 +321,6 @@ regolith_cosmic_runtime_main() {
     set -e
 
     regolith_cosmic_runtime_cleanup
-    regolith_cosmic_runtime_terminate_owned_parent
 
     return "$compositor_status"
 }

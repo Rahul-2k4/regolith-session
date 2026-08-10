@@ -52,12 +52,36 @@ regolith_cosmic_runtime_parent_start_pid() { printf '%s\n' 503; }
     echo "expected exact dbus-run-session ancestry to be accepted" >&2
     exit 1
 }
+cat() {
+    case "$1" in
+        /proc/601/stat) printf '%s\n' '601 (cosmic session (nested)) S 503 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0' ;;
+        /proc/602/stat) printf '%s\n' '602 (cosmic-session) S not-a-pid 0 0 0 0' ;;
+        /proc/603/stat) printf '%s\n' '603 cosmic-session S 503 0 0' ;;
+        *) command cat "$@" ;;
+    esac
+}
+[ "$(regolith_cosmic_runtime_parse_parent_pid 601)" = 503 ] || {
+    echo "expected PPID after final closing parenthesis" >&2
+    exit 1
+}
+if regolith_cosmic_runtime_parse_parent_pid 602 >/dev/null || regolith_cosmic_runtime_parse_parent_pid 603 >/dev/null; then
+    echo "expected malformed stat PPID to be rejected" >&2
+    exit 1
+fi
+unset -f cat
+regolith_cosmic_runtime_parent_pid() { mock_parent_pid "$1"; }
 signal_log=""
 kill() { signal_log="$*"; }
+regolith_cosmic_runtime_parent_executable() { mock_parent_executable "$1"; }
 regolith_cosmic_runtime_parent_start_pid() { printf '%s\n' 501; }
 regolith_cosmic_runtime_terminate_owned_parent
 [ "$signal_log" = "-TERM 501" ] || {
     echo "expected only the verified COSMIC parent to receive TERM" >&2
+    exit 1
+}
+regolith_cosmic_runtime_terminate_owned_parent
+[ "$signal_log" = "-TERM 501" ] || {
+    echo "expected parent termination to be idempotent" >&2
     exit 1
 }
 signal_log=""
@@ -136,10 +160,23 @@ export REGOLITH_COSMIC_SESSION_HELPERS="$helper_script"
 export REGOLITH_COSMIC_ENABLE_OSD=true
 export REGOLITH_COSMIC_OSD_DELAY_SECONDS=10
 
-# Cleanup is deliberately safe to repeat because the runtime's EXIT trap calls
-# it after the normal compositor-exit path has already cleaned up.
+cosmic_parent_termination_attempted=false
+signal_log=""
+kill() { signal_log="$*"; }
+regolith_cosmic_runtime_parent_executable() { mock_parent_executable "$1"; }
+regolith_cosmic_runtime_parent_pid() { mock_parent_pid "$1"; }
+regolith_cosmic_runtime_parent_start_pid() { printf '%s\n' 501; }
 regolith_cosmic_runtime_cleanup
+[ "$signal_log" = "-TERM 501" ] || {
+    echo "expected cleanup to terminate the verified COSMIC parent" >&2
+    exit 1
+}
 regolith_cosmic_runtime_cleanup
+[ "$signal_log" = "-TERM 501" ] || {
+    echo "expected cleanup parent termination to be idempotent" >&2
+    exit 1
+}
+unset -f kill regolith_cosmic_runtime_parent_executable regolith_cosmic_runtime_parent_start_pid
 
 export REGOLITH_COSMIC_TEST_BLOCK_IMPORT="$workdir/early-term.ready"
 "$ROOT_DIR/usr/lib/regolith/regolith-session-cosmic-runtime" sway >"$workdir/early-runtime.log" 2>&1 &
