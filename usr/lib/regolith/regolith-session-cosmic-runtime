@@ -136,6 +136,10 @@ regolith_cosmic_runtime_terminate_owned_parent() {
     fi
     cosmic_parent_termination_attempted=true
 
+    if [ "${REGOLITH_COSMIC_LAUNCHER_OWNED:-}" != 1 ]; then
+        return 0
+    fi
+
     parent_pid="$(regolith_cosmic_runtime_find_owned_parent || true)"
     if [ -n "$parent_pid" ]; then
         kill -TERM "$parent_pid" >/dev/null 2>&1 || true

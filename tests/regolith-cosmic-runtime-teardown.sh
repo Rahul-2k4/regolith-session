@@ -4,6 +4,7 @@ set -Eeu -o pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 workdir="$(mktemp -d)"
+touch "$workdir/pids"
 cleanup() {
     local pid=
 
@@ -76,6 +77,14 @@ regolith_cosmic_runtime_parent_executable() { mock_parent_executable "$1"; }
 signal_log=""
 kill() { signal_log="$*"; }
 cosmic_parent_termination_attempted=false
+unset REGOLITH_COSMIC_LAUNCHER_OWNED
+regolith_cosmic_runtime_terminate_owned_parent
+[ -z "$signal_log" ] || {
+    echo "expected absent launcher marker to prevent parent termination" >&2
+    exit 1
+}
+cosmic_parent_termination_attempted=false
+export REGOLITH_COSMIC_LAUNCHER_OWNED=1
 regolith_cosmic_runtime_terminate_owned_parent
 [ "$(wc -l <"$lookup_file")" -gt 0 ] || {
     echo "expected verified ancestry lookup before termination" >&2
@@ -219,6 +228,7 @@ unset -f kill regolith_cosmic_runtime_parent_executable regolith_cosmic_runtime_
 export REGOLITH_COSMIC_TEST_BLOCK_IMPORT="$workdir/early-term.ready"
 "$ROOT_DIR/usr/lib/regolith/regolith-session-cosmic-runtime" sway >"$workdir/early-runtime.log" 2>&1 &
 early_runtime_pid="$!"
+printf '%s\n' "$early_runtime_pid" >>"$workdir/pids"
 for _ in $(seq 1 50); do
     [ -e "$REGOLITH_COSMIC_TEST_BLOCK_IMPORT" ] && break
     sleep 0.02
@@ -243,6 +253,7 @@ unset REGOLITH_COSMIC_TEST_BLOCK_IMPORT
 
 "$ROOT_DIR/usr/lib/regolith/regolith-session-cosmic-runtime" sway >"$workdir/runtime.log" 2>&1 &
 runtime_pid="$!"
+printf '%s\n' "$runtime_pid" >>"$workdir/pids"
 
 for _ in $(seq 1 50); do
     if [ -s "$workdir/helper.pid" ]; then

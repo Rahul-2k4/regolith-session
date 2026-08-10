@@ -61,4 +61,5 @@ if [[ "${unsupported_gpu,,}" == "true" ]]; then
 fi
 
 echo "Regolith is launching COSMIC session with Sway using $SWAY_CONFIG_FILE"
+export REGOLITH_COSMIC_LAUNCHER_OWNED=1
 exec dbus-run-session -- /usr/bin/cosmic-session "${sway_command[@]}"
