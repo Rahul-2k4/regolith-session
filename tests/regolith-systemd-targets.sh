@@ -40,8 +40,8 @@ has_line "$COSMIC_IDLE_SERVICE" "ExecStart=/usr/lib/regolith/regolith-cosmic-idl
 grep -Fq 'SWAYSOCK' "$COSMIC_RUNTIME" || fail "COSMIC runtime does not handle SWAYSOCK"
 grep -Fq 'import-environment XDG_CURRENT_DESKTOP WAYLAND_DISPLAY SWAYSOCK' "$COSMIC_RUNTIME" || fail "COSMIC runtime does not import session compositor environment"
 grep -Fq 'unset-environment XDG_CURRENT_DESKTOP WAYLAND_DISPLAY SWAYSOCK' "$COSMIC_RUNTIME" || fail "COSMIC runtime does not clean up session compositor environment"
-has_line "$ROOT_DIR/debian/regolith-session-sway.install" "usr/lib/systemd/user/regolith-gnome.target" || fail "GNOME target is not packaged"
-has_line "$ROOT_DIR/debian/regolith-session-sway.install" "usr/lib/systemd/user/gnome-session.target.d" || fail "GNOME parent drop-in is not packaged"
+has_line "$ROOT_DIR/debian/regolith-session-common.install" "usr/lib/systemd/user/regolith-gnome.target" || fail "GNOME target is not packaged in session-common"
+has_line "$ROOT_DIR/debian/regolith-session-common.install" "usr/lib/systemd/user/gnome-session.target.d" || fail "GNOME parent drop-in is not packaged in session-common"
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/user/regolith-cosmic.target" || fail "COSMIC target is not packaged"
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/user/cosmic-session.target.d" || fail "COSMIC parent drop-in is not packaged"
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/user/regolith-init-cosmic-idle.service" || fail "COSMIC idle service is not packaged"
@@ -56,5 +56,17 @@ for source in "$ROOT_DIR/usr/bin/regolith-session-cosmic-launch" "$ROOT_DIR/usr/
     if grep -Fq "regolith-init-displayd.service" "$source"; then fail "COSMIC launcher still masks displayd"; fi
     if grep -Fq "regolith-init-kanshi.service" "$source"; then fail "COSMIC launcher still masks kanshi"; fi
     if grep -Fq "regolith_cosmic_start_existing_daemon" "$source"; then fail "COSMIC launcher still direct-starts a legacy daemon"; fi
+done
+# regolith-gnome.target is activated only by the gnome-session.target.d drop-in,
+# which Wants= it. Both ship from regolith-session-common because flashback and
+# sway are co-installable (no Conflicts/Breaks/Replaces between them), so
+# duplicate paths would collide in dpkg, and shipping the target without its
+# drop-in would leave it inert on the flashback path.
+for gnome_path in usr/lib/systemd/user/regolith-gnome.target usr/lib/systemd/user/gnome-session.target.d; do
+  for install_file in "$ROOT_DIR"/debian/regolith-session-*.install; do
+    case "$install_file" in *regolith-session-common.install) continue ;; esac
+    has_line "$install_file" "$gnome_path" \
+      && fail "duplicate owner of $gnome_path in $(basename "$install_file")"
+  done
 done
 echo "systemd target metadata: PASS"
