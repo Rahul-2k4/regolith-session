@@ -11,6 +11,7 @@ COSMIC_RUNTIME="$ROOT_DIR/usr/lib/regolith/regolith-session-cosmic-runtime"
 
 fail() { echo "systemd target test: $*" >&2; exit 1; }
 has_line() { grep -Fqx "$2" "$1"; }
+exactly_once() { [ "$(grep -Fxc "$2" "$1")" -eq 1 ]; }
 
 [ -f "$GNOME_TARGET" ] || fail "missing GNOME target"
 [ -f "$COSMIC_TARGET" ] || fail "missing COSMIC target"
@@ -46,6 +47,30 @@ has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/use
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/user/cosmic-session.target.d" || fail "COSMIC parent drop-in is not packaged"
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/user/regolith-init-cosmic-idle.service" || fail "COSMIC idle service is not packaged"
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/regolith/regolith-session-cosmic-runtime" || fail "COSMIC runtime is not packaged"
+cosmic_only_paths=(
+  usr/bin/regolith-session-cosmic-launch
+  usr/share/man/man1/regolith-session-cosmic-launch.1
+  usr/lib/regolith/regolith-session-cosmic.sh
+  usr/lib/regolith/regolith-session-cosmic-runtime
+  usr/share/wayland-sessions/regolith-cosmic.desktop
+  usr/lib/systemd/user/regolith-cosmic.target
+  usr/lib/systemd/user/regolith-init-cosmic-idle.service
+  usr/lib/systemd/user/cosmic-session.target.d
+  usr/lib/regolith/regolith-cosmic-idle-fallback
+)
+for cosmic_path in "${cosmic_only_paths[@]}"; do
+  exactly_once "$ROOT_DIR/debian/regolith-session-cosmic.install" "$cosmic_path" \
+    || fail "COSMIC artifact is not owned exactly once by session-cosmic: $cosmic_path"
+  for install_file in \
+    "$ROOT_DIR/debian/regolith-session-common.install" \
+    "$ROOT_DIR/debian/regolith-session-flashback.install" \
+    "$ROOT_DIR/debian/regolith-session-flashback-ext.install" \
+    "$ROOT_DIR/debian/regolith-session-sway.install"; do
+    if has_line "$install_file" "$cosmic_path"; then
+      fail "COSMIC-only artifact is also owned by $(basename "$install_file"): $cosmic_path"
+    fi
+  done
+done
 cosmic_control="$(sed -n '/^Package: regolith-session-cosmic$/,/^Package: /p' "$ROOT_DIR/debian/control")"
 has_line "$ROOT_DIR/debian/regolith-session-sway.install" "usr/share/wayland-sessions/regolith-wayland.desktop" || fail "Sway Wayland desktop entry is not packaged explicitly"
 if grep -Fqx "usr/share/wayland-sessions" "$ROOT_DIR/debian/regolith-session-sway.install"; then fail "Sway package uses a broad Wayland desktop entry wildcard"; fi
