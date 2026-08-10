@@ -116,7 +116,7 @@ regolith_cosmic_runtime_find_owned_parent() {
     while [ "$pid" -gt 1 ] 2>/dev/null; do
         executable="$(regolith_cosmic_runtime_parent_executable "$pid" || true)"
         case "$executable" in
-            cosmic-session|dbus-run-session)
+            cosmic-session)
                 printf '%s\n' "$pid"
                 return 0
                 ;;

@@ -48,10 +48,77 @@ if regolith_cosmic_runtime_find_owned_parent >/dev/null; then
     exit 1
 fi
 regolith_cosmic_runtime_parent_start_pid() { printf '%s\n' 503; }
-[ "$(regolith_cosmic_runtime_find_owned_parent)" = 503 ] || {
-    echo "expected exact dbus-run-session ancestry to be accepted" >&2
+if regolith_cosmic_runtime_find_owned_parent >/dev/null; then
+    echo "expected bare dbus-run-session ancestry to be rejected" >&2
+    exit 1
+fi
+
+regolith_cosmic_runtime_parent_start_pid() { printf '%s\n' 504; }
+if regolith_cosmic_runtime_find_owned_parent >/dev/null; then
+    echo "expected unreadable ancestry to be rejected" >&2
+    exit 1
+fi
+
+lookup_file="${workdir}/ancestry-lookups"
+mock_parent_executable() {
+    printf '%s\n' lookup >>"$lookup_file"
+    case "$1" in
+        501) printf '%s\n' cosmic-session ;;
+        502) printf '%s\n' unrelated-parent ;;
+        503) printf '%s\n' dbus-run-session ;;
+        504) return 1 ;;
+        *) return 1 ;;
+    esac
+}
+regolith_cosmic_runtime_parent_start_pid() { printf '%s\n' 501; }
+regolith_cosmic_runtime_parent_pid() { mock_parent_pid "$1"; }
+regolith_cosmic_runtime_parent_executable() { mock_parent_executable "$1"; }
+signal_log=""
+kill() { signal_log="$*"; }
+cosmic_parent_termination_attempted=false
+regolith_cosmic_runtime_terminate_owned_parent
+[ "$(wc -l <"$lookup_file")" -gt 0 ] || {
+    echo "expected verified ancestry lookup before termination" >&2
     exit 1
 }
+[ "$signal_log" = "-TERM 501" ] || {
+    echo "expected only the verified COSMIC parent to receive TERM" >&2
+    exit 1
+}
+signal_log=""
+regolith_cosmic_runtime_terminate_owned_parent
+[ -z "$signal_log" ] || {
+    echo "expected idempotent second termination to emit no signal" >&2
+    exit 1
+}
+cosmic_parent_termination_attempted=false
+signal_log=""
+: >"$lookup_file"
+regolith_cosmic_runtime_parent_start_pid() { printf '%s\n' 502; }
+regolith_cosmic_runtime_terminate_owned_parent
+[ "$(wc -l <"$lookup_file")" -gt 0 ] || {
+    echo "expected arbitrary-parent scenario to perform ancestry lookup" >&2
+    exit 1
+}
+[ -z "$signal_log" ] || {
+    echo "expected arbitrary parent teardown to be a no-op" >&2
+    exit 1
+}
+cosmic_parent_termination_attempted=false
+signal_log=""
+: >"$lookup_file"
+regolith_cosmic_runtime_parent_start_pid() { printf '%s\n' 504; }
+regolith_cosmic_runtime_terminate_owned_parent
+[ "$(wc -l <"$lookup_file")" -gt 0 ] || {
+    echo "expected unreadable ancestry scenario to perform lookup" >&2
+    exit 1
+}
+[ -z "$signal_log" ] || {
+    echo "expected unreadable ancestry teardown to be a no-op" >&2
+    exit 1
+}
+unset -f kill
+
 cat() {
     case "$1" in
         /proc/601/stat) printf '%s\n' '601 (cosmic session (nested)) S 503 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0' ;;
@@ -69,36 +136,6 @@ if regolith_cosmic_runtime_parse_parent_pid 602 >/dev/null || regolith_cosmic_ru
     exit 1
 fi
 unset -f cat
-regolith_cosmic_runtime_parent_pid() { mock_parent_pid "$1"; }
-signal_log=""
-kill() { signal_log="$*"; }
-regolith_cosmic_runtime_parent_executable() { mock_parent_executable "$1"; }
-regolith_cosmic_runtime_parent_start_pid() { printf '%s\n' 501; }
-regolith_cosmic_runtime_terminate_owned_parent
-[ "$signal_log" = "-TERM 501" ] || {
-    echo "expected only the verified COSMIC parent to receive TERM" >&2
-    exit 1
-}
-regolith_cosmic_runtime_terminate_owned_parent
-[ "$signal_log" = "-TERM 501" ] || {
-    echo "expected parent termination to be idempotent" >&2
-    exit 1
-}
-signal_log=""
-regolith_cosmic_runtime_parent_start_pid() { printf '%s\n' 502; }
-regolith_cosmic_runtime_terminate_owned_parent
-[ -z "$signal_log" ] || {
-    echo "expected arbitrary parent teardown to be a no-op" >&2
-    exit 1
-}
-signal_log=""
-regolith_cosmic_runtime_parent_start_pid() { printf '%s\n' 504; }
-regolith_cosmic_runtime_terminate_owned_parent
-[ -z "$signal_log" ] || {
-    echo "expected unreadable ancestry teardown to be a no-op" >&2
-    exit 1
-}
-unset -f kill
 unset -f regolith_cosmic_runtime_parent_executable regolith_cosmic_runtime_parent_pid regolith_cosmic_runtime_parent_start_pid
 
 stub_dir="$workdir/bin"
@@ -171,9 +208,10 @@ regolith_cosmic_runtime_cleanup
     echo "expected cleanup to terminate the verified COSMIC parent" >&2
     exit 1
 }
+signal_log=""
 regolith_cosmic_runtime_cleanup
-[ "$signal_log" = "-TERM 501" ] || {
-    echo "expected cleanup parent termination to be idempotent" >&2
+[ -z "$signal_log" ] || {
+    echo "expected idempotent cleanup to emit no second signal" >&2
     exit 1
 }
 unset -f kill regolith_cosmic_runtime_parent_executable regolith_cosmic_runtime_parent_start_pid
