@@ -113,7 +113,7 @@ Description: Experimental Regolith COSMIC Wayland session
 Package: regolith-session-common
 Architecture: any
 Depends: ${misc:Depends},
-    regolith-resource-loader
+    regolith-look-default-loader
 Breaks: regolith-session (<= 1.1.2)
 Conflicts: session-shortcuts, regolith-session-flashback (<= 0.6.4)
 Description: Common files for regolith X11 session
