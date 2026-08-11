@@ -22,6 +22,13 @@ flashback_control=$(sed -n '/^Package: regolith-session-flashback$/,/^Package: /
 cosmic_control=$(sed -n '/^Package: regolith-session-cosmic$/,/^Package: /p' "$CONTROL")
 [ -n "$cosmic_control" ] || fail "regolith-session-cosmic stanza is missing"
 
+if printf '%s\\n' "$flashback_control" | grep -Eq '^[[:space:]]+xorg([,[:space:]]|$)'; then
+    fail "flashback package directly depends on the xorg metapackage"
+fi
+if printf '%s\\n' "$flashback_control" | grep -Eq '^[[:space:]]+xserver-xorg([,[:space:]]|$)'; then
+    fail "flashback package replaced xorg with xserver-xorg"
+fi
+
 gnome_targets_install="$ROOT_DIR/debian/regolith-session-gnome-targets.install"
 [ -f "$gnome_targets_install" ] || fail "GNOME target install manifest is missing"
 

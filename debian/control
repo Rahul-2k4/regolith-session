@@ -30,7 +30,6 @@ Depends: ${misc:Depends},
     regolith-session-gnome-targets,
     x-terminal-emulator,
     x11-xserver-utils,
-    xorg,
     xrescat
 Recommends:
     i3-next-workspace,
