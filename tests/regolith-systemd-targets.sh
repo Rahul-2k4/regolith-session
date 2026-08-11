@@ -119,6 +119,20 @@ done
 common_control="$(package_stanza regolith-session-common "$ROOT_DIR/debian/control")"
 printf '%s\n' "$common_control" | grep -Fqx "Replaces: regolith-session-sway" \
   || fail "session-common does not declare the regolith-session-sway ownership transition"
+cosmic_control="$(package_stanza regolith-session-cosmic "$ROOT_DIR/debian/control")"
+sway_control="$(package_stanza regolith-session-sway "$ROOT_DIR/debian/control")"
+flashback_control="$(package_stanza regolith-session-flashback "$ROOT_DIR/debian/control")"
+for dependency in gnome-session-bin gnome-settings-daemon; do
+  if printf '%s\n' "$cosmic_control" | grep -Eq "^[[:space:]]+${dependency},?$"; then
+    fail "COSMIC package directly depends or recommends on $dependency"
+  fi
+done
+printf '%s\n' "$sway_control" | grep -Eq '^[[:space:]]+gnome-session-bin,$' \
+  || fail "Sway package lost gnome-session-bin"
+printf '%s\n' "$sway_control" | grep -Eq '^[[:space:]]+gnome-settings-daemon,$' \
+  || fail "Sway package lost gnome-settings-daemon"
+printf '%s\n' "$flashback_control" | grep -Eq '^[[:space:]]+gnome-session-bin,$' \
+  || fail "Flashback package lost gnome-session-bin"
 has_line "$ROOT_DIR/debian/regolith-session-sway.install" "usr/share/wayland-sessions/regolith-wayland.desktop" || fail "Sway Wayland desktop entry is not packaged explicitly"
 if grep -Fqx "usr/share/wayland-sessions" "$ROOT_DIR/debian/regolith-session-sway.install"; then fail "Sway package uses a broad Wayland desktop entry wildcard"; fi
 if comm -12 <(sed -n "s#^usr/share/wayland-sessions/##p" "$ROOT_DIR/debian/regolith-session-sway.install" | sort) <(sed -n "s#^usr/share/wayland-sessions/##p" "$ROOT_DIR/debian/regolith-session-cosmic.install" | sort) | grep -q .; then fail "Sway and COSMIC packages own the same Wayland desktop entry"; fi
