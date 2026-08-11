@@ -120,8 +120,9 @@ common_control="$(package_stanza regolith-session-common "$ROOT_DIR/debian/contr
 printf '%s\n' "$common_control" | grep -Fqx "Replaces: regolith-session-sway" \
   || fail "session-common does not declare the regolith-session-sway ownership transition"
 gnome_targets_control="$(package_stanza regolith-session-gnome-targets "$ROOT_DIR/debian/control")"
-printf '%s\n' "$gnome_targets_control" | grep -Fqx "Breaks: regolith-session-common (<< 1.2.0-1ubuntu1-1-1regolith-resolute)" \
-  || fail "session-gnome-targets does not declare versioned Breaks transitions"
+if printf '%s\n' "$gnome_targets_control" | grep -Eq '^Breaks:.*(regolith-session-common|regolith-session-sway)'; then
+  fail "session-gnome-targets introduces a predecessor Breaks relationship"
+fi
 printf '%s\n' "$gnome_targets_control" | grep -Fqx "Replaces: regolith-session-common, regolith-session-sway" \
   || fail "session-gnome-targets does not declare unversioned Replaces transitions"
 has_line "$ROOT_DIR/debian/regolith-session-sway.install" "usr/share/wayland-sessions/regolith-wayland.desktop" || fail "Sway Wayland desktop entry is not packaged explicitly"
