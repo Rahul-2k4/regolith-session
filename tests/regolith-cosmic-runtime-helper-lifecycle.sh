@@ -63,10 +63,12 @@ fi
 target_start_line="$(line_number 'systemctl --user start regolith-cosmic.target')"
 legacy_mask_line="$(line_number 'systemctl --user mask --runtime regolith-gnome.target')"
 legacy_stop_line="$(line_number 'systemctl --user stop regolith-gnome.target')"
+parent_stop_line="$(line_number 'systemctl --user stop cosmic-session.target')"
 
 [ -n "$target_start_line" ] || { echo "successful COSMIC startup must idempotently start its helper target" >&2; exit 1; }
 [ -n "$legacy_mask_line" ] || { echo "successful COSMIC startup must isolate the legacy GNOME target" >&2; exit 1; }
 [ -n "$legacy_stop_line" ] || { echo "successful COSMIC startup must stop the legacy GNOME target" >&2; exit 1; }
+[ -n "$parent_stop_line" ] || { echo "active COSMIC parent must stop after compositor exit" >&2; exit 1; }
 [ "$legacy_mask_line" -lt "$target_start_line" ] \
     || { echo "legacy target isolation must precede COSMIC helper target startup" >&2; exit 1; }
 [ "$legacy_stop_line" -lt "$target_start_line" ] \

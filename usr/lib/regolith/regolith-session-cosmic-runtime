@@ -198,6 +198,7 @@ regolith_cosmic_runtime_main() {
                         regolith_cosmic_runtime_abort_session 1
                         return $?
                     fi
+                    target_started=true
                     if ! start_regolith_cosmic_helpers; then
                         echo "regolith-session: failed to start COSMIC helpers; aborting session" >&2
                         regolith_cosmic_runtime_abort_session 1
