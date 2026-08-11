@@ -120,8 +120,10 @@ common_control="$(package_stanza regolith-session-common "$ROOT_DIR/debian/contr
 printf '%s\n' "$common_control" | grep -Fqx "Replaces: regolith-session-sway" \
   || fail "session-common does not declare the regolith-session-sway ownership transition"
 gnome_targets_control="$(package_stanza regolith-session-gnome-targets "$ROOT_DIR/debian/control")"
-printf '%s\n' "$gnome_targets_control" | grep -Eq '^Replaces:.*(^|, *)regolith-session-sway([, ]|$)' \
-  || fail "session-gnome-targets does not declare the regolith-session-sway ownership transition"
+printf '%s\n' "$gnome_targets_control" | grep -Fqx "Breaks: regolith-session-common (<< 1.2.0-1ubuntu1-1-1regolith-resolute), regolith-session-sway (<< 1.2.0-1ubuntu1-1-1regolith-resolute)" \
+  || fail "session-gnome-targets does not declare versioned Breaks transitions"
+printf '%s\n' "$gnome_targets_control" | grep -Fqx "Replaces: regolith-session-common (<< 1.2.0-1ubuntu1-1-1regolith-resolute), regolith-session-sway (<< 1.2.0-1ubuntu1-1-1regolith-resolute)" \
+  || fail "session-gnome-targets does not declare versioned Replaces transitions"
 has_line "$ROOT_DIR/debian/regolith-session-sway.install" "usr/share/wayland-sessions/regolith-wayland.desktop" || fail "Sway Wayland desktop entry is not packaged explicitly"
 if grep -Fqx "usr/share/wayland-sessions" "$ROOT_DIR/debian/regolith-session-sway.install"; then fail "Sway package uses a broad Wayland desktop entry wildcard"; fi
 if comm -12 <(sed -n "s#^usr/share/wayland-sessions/##p" "$ROOT_DIR/debian/regolith-session-sway.install" | sort) <(sed -n "s#^usr/share/wayland-sessions/##p" "$ROOT_DIR/debian/regolith-session-cosmic.install" | sort) | grep -q .; then fail "Sway and COSMIC packages own the same Wayland desktop entry"; fi
