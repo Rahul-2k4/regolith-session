@@ -7,6 +7,15 @@ Standards-Version: 4.1.2
 Homepage: https://github.com/regolith-linux/regolith-desktop
 Vcs-Git: https://github.com/regolith-linux/regolith-desktop.git
 
+Package: regolith-session-gnome-targets
+Architecture: all
+Depends: ${misc:Depends}
+Breaks: regolith-session-common (<< 1.2.0-1ubuntu1-1-1regolith-resolute)
+Replaces: regolith-session-common
+Description: GNOME systemd targets for legacy Regolith sessions
+ This package contains the GNOME systemd targets required by the legacy
+ Regolith GNOME Flashback and Sway sessions.
+
 Package: regolith-session-flashback
 Architecture: any
 Depends: ${misc:Depends},
@@ -18,6 +27,7 @@ Depends: ${misc:Depends},
     regolith-i3-root-config,
     regolith-look-default,
     regolith-session-common (>= 0.7.1),
+    regolith-session-gnome-targets,
     x-terminal-emulator,
     x11-xserver-utils,
     xorg,
@@ -56,6 +66,7 @@ Depends: ${misc:Depends},
     gnome-settings-daemon,
     regolith-look-default,
     regolith-session-common,
+    regolith-session-gnome-targets,
     regolith-sway-root-config,
     sway-regolith,
     trawlcat,
