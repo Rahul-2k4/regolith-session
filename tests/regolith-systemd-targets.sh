@@ -70,13 +70,12 @@ grep -Fq 'SWAYSOCK' "$COSMIC_RUNTIME" || fail "COSMIC runtime does not handle SW
 grep -Fq 'import-environment XDG_CURRENT_DESKTOP WAYLAND_DISPLAY SWAYSOCK' "$COSMIC_RUNTIME" || fail "COSMIC runtime does not import session compositor environment"
 grep -Fq 'unset-environment XDG_CURRENT_DESKTOP WAYLAND_DISPLAY SWAYSOCK' "$COSMIC_RUNTIME" || fail "COSMIC runtime does not clean up session compositor environment"
 GNOME_PACKAGE_INSTALL="$ROOT_DIR/debian/regolith-session-gnome-target.install"
-exactly_once "$GNOME_PACKAGE_INSTALL" "usr/lib/systemd/user/regolith-gnome.target" || fail "GNOME target is not owned exactly once by the dedicated GNOME target package"
-exactly_once "$GNOME_PACKAGE_INSTALL" "usr/lib/systemd/user/gnome-session.target.d" || fail "GNOME parent drop-in is not owned exactly once by the dedicated GNOME target package"
-if grep -Fqx "usr/lib/systemd/user/regolith-gnome.target" "$ROOT_DIR/debian/regolith-session-common.install"; then
-  fail "COSMIC dependency session-common still owns the GNOME target"
-fi
-if grep -Fqx "usr/lib/systemd/user/gnome-session.target.d" "$ROOT_DIR/debian/regolith-session-common.install"; then
-  fail "COSMIC dependency session-common still owns the GNOME parent drop-in"
+GNOME_TARGET_PATH="usr/lib/systemd/user/regolith-gnome.target"
+GNOME_DROPIN_PATH="usr/lib/systemd/user/gnome-session.target.d/regolith-gnome.conf"
+exactly_once "$GNOME_PACKAGE_INSTALL" "$GNOME_TARGET_PATH" || fail "GNOME target is not owned exactly once by the dedicated GNOME target package"
+exactly_once "$GNOME_PACKAGE_INSTALL" "$GNOME_DROPIN_PATH" || fail "GNOME parent drop-in is not owned exactly once by the dedicated GNOME target package"
+if grep -Fqx "usr/lib/systemd/user/gnome-session.target.d" "$GNOME_PACKAGE_INSTALL"; then
+  fail "dedicated GNOME target package claims the parent drop-in directory instead of its file"
 fi
 has_line "$ROOT_DIR/debian/control" "Package: regolith-session-gnome-target" || fail "dedicated GNOME target package is missing from control"
 gnome_package_control="$(sed -n '/^Package: regolith-session-gnome-target$/,/^Package: /p' "$ROOT_DIR/debian/control")"
@@ -139,12 +138,28 @@ done
 # regolith-gnome.target is activated only by the gnome-session.target.d drop-in,
 # which Wants= it. Both GNOME-backed session packages depend on one dedicated
 # package so the payload is co-installable and the COSMIC dependency path stays
-# free of GNOME target files.
-for gnome_path in usr/lib/systemd/user/regolith-gnome.target usr/lib/systemd/user/gnome-session.target.d; do
+# free of GNOME target files. Check concrete source files so a sibling manifest
+# cannot hide ownership behind a parent directory entry.
+for gnome_path in "$GNOME_TARGET_PATH" "$GNOME_DROPIN_PATH"; do
+  gnome_owner_count=0
+  gnome_owner=
   for install_file in "$ROOT_DIR"/debian/regolith-session-*.install; do
-    case "$install_file" in *regolith-session-gnome-target.install) continue ;; esac
-    has_line "$install_file" "$gnome_path" \
-      && fail "duplicate owner of $gnome_path outside the dedicated GNOME target package: $(basename "$install_file")"
+    while IFS= read -r sibling_path || [ -n "$sibling_path" ]; do
+      sibling_path=$(trim_install_path "$sibling_path")
+      case "$sibling_path" in
+        ""|\#*) continue ;;
+      esac
+      if paths_overlap "$gnome_path" "$sibling_path"; then
+        gnome_owner_count=$((gnome_owner_count + 1))
+        gnome_owner=$(basename "$install_file")
+      fi
+    done < "$install_file"
   done
+  [ "$gnome_owner_count" -eq 1 ] || fail "GNOME payload has $gnome_owner_count manifest owners: $gnome_path"
+  [ "$gnome_owner" = "regolith-session-gnome-target.install" ] \
+    || fail "GNOME payload is owned by $gnome_owner instead of the dedicated package: $gnome_path"
+done
+for gnome_path in "$GNOME_TARGET_PATH" "$GNOME_DROPIN_PATH"; do
+  [ -f "$ROOT_DIR/$gnome_path" ] || fail "missing GNOME payload source: $gnome_path"
 done
 echo "systemd target metadata: PASS"

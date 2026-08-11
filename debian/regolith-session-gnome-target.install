@@ -1,2 +1,2 @@
 usr/lib/systemd/user/regolith-gnome.target
-usr/lib/systemd/user/gnome-session.target.d
+usr/lib/systemd/user/gnome-session.target.d/regolith-gnome.conf
