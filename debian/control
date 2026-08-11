@@ -11,7 +11,7 @@ Package: regolith-session-gnome-targets
 Architecture: all
 Depends: ${misc:Depends}
 Breaks: regolith-session-common (<< 1.2.0-1ubuntu1-1-1regolith-resolute)
-Replaces: regolith-session-common
+Replaces: regolith-session-common, regolith-session-sway
 Description: GNOME systemd targets for legacy Regolith sessions
  This package contains the GNOME systemd targets required by the legacy
  Regolith GNOME Flashback and Sway sessions.
