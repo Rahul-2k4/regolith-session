@@ -50,12 +50,26 @@ export SWAYSOCK="$workdir/sway.sock"
 
 "$ROOT_DIR/usr/lib/regolith/regolith-session-cosmic-runtime" bash -c 'sleep 0.2'
 
+line_number() {
+    local event="$1"
+    awk -v event="$event" '$0 == event { print NR; exit }' "$log_file"
+}
+
 if grep -Fqx 'systemctl --user restart regolith-cosmic.target' "$log_file"; then
     echo "successful COSMIC startup must not restart its already-active helper target" >&2
     exit 1
 fi
 
-grep -Fqx 'systemctl --user start regolith-cosmic.target' "$log_file" \
-    || { echo "successful COSMIC startup must idempotently start its helper target" >&2; exit 1; }
+target_start_line="$(line_number 'systemctl --user start regolith-cosmic.target')"
+legacy_mask_line="$(line_number 'systemctl --user mask --runtime regolith-gnome.target')"
+legacy_stop_line="$(line_number 'systemctl --user stop regolith-gnome.target')"
+
+[ -n "$target_start_line" ] || { echo "successful COSMIC startup must idempotently start its helper target" >&2; exit 1; }
+[ -n "$legacy_mask_line" ] || { echo "successful COSMIC startup must isolate the legacy GNOME target" >&2; exit 1; }
+[ -n "$legacy_stop_line" ] || { echo "successful COSMIC startup must stop the legacy GNOME target" >&2; exit 1; }
+[ "$legacy_mask_line" -lt "$target_start_line" ] \
+    || { echo "legacy target isolation must precede COSMIC helper target startup" >&2; exit 1; }
+[ "$legacy_stop_line" -lt "$target_start_line" ] \
+    || { echo "legacy target shutdown must precede COSMIC helper target startup" >&2; exit 1; }
 
 echo "COSMIC helper target lifecycle: PASS"

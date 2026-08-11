@@ -188,13 +188,13 @@ regolith_cosmic_runtime_main() {
                 systemctl --user import-environment XDG_CURRENT_DESKTOP WAYLAND_DISPLAY SWAYSOCK
 
                 if systemctl --user is-active --quiet cosmic-session.target; then
-                    if ! systemctl --user start regolith-cosmic.target; then
-                        echo "regolith-session: failed to start COSMIC helper target; aborting COSMIC session" >&2
+                    if ! mask_regolith_legacy_targets_for_cosmic; then
+                        echo "regolith-session: failed to isolate legacy Regolith targets; aborting COSMIC session" >&2
                         regolith_cosmic_runtime_abort_session 1
                         return $?
                     fi
-                    if ! mask_regolith_legacy_targets_for_cosmic; then
-                        echo "regolith-session: failed to isolate legacy Regolith targets; aborting COSMIC session" >&2
+                    if ! systemctl --user start regolith-cosmic.target; then
+                        echo "regolith-session: failed to start COSMIC helper target; aborting COSMIC session" >&2
                         regolith_cosmic_runtime_abort_session 1
                         return $?
                     fi
@@ -206,31 +206,33 @@ regolith_cosmic_runtime_main() {
                 else
                     target_state_status=$?
 
-                    if [ "$target_state_status" -eq 3 ] && systemctl --user start cosmic-session.target; then
-                        target_started=true
+                    if [ "$target_state_status" -eq 3 ]; then
+                        if ! mask_regolith_legacy_targets_for_cosmic; then
+                            echo "regolith-session: failed to isolate legacy Regolith targets; aborting COSMIC session" >&2
+                            regolith_cosmic_runtime_abort_session 1
+                            return $?
+                        fi
 
-                        if kill -0 "$compositor_pid" >/dev/null 2>&1; then
-                            if ! mask_regolith_legacy_targets_for_cosmic; then
-                                echo "regolith-session: failed to isolate legacy Regolith targets; aborting COSMIC session" >&2
-                                regolith_cosmic_runtime_abort_session 1
-                                return $?
-                            fi
-                            if ! start_regolith_cosmic_helpers; then
-                                echo "regolith-session: failed to start COSMIC helpers; aborting session" >&2
-                                regolith_cosmic_runtime_abort_session 1
-                                return $?
+                        if systemctl --user start cosmic-session.target; then
+                            target_started=true
+
+                            if kill -0 "$compositor_pid" >/dev/null 2>&1; then
+                                if ! start_regolith_cosmic_helpers; then
+                                    echo "regolith-session: failed to start COSMIC helpers; aborting session" >&2
+                                    regolith_cosmic_runtime_abort_session 1
+                                    return $?
+                                fi
+                            else
+                                echo "regolith-session: compositor exited after COSMIC target startup; stopping target and skipping helpers" >&2
+                                systemctl --user stop cosmic-session.target || true
+                                target_started=false
                             fi
                         else
-                            echo "regolith-session: compositor exited after COSMIC target startup; stopping target and skipping helpers" >&2
-                            systemctl --user stop cosmic-session.target || true
-                            target_started=false
+                            echo "regolith-session: failed to start cosmic-session.target; skipping COSMIC helper startup" >&2
+                            unmask_regolith_legacy_targets_owned_by_cosmic
                         fi
                     else
-                        if [ "$target_state_status" -eq 3 ]; then
-                            echo "regolith-session: failed to start cosmic-session.target; skipping COSMIC helper startup" >&2
-                        else
-                            echo "regolith-session: failed to query cosmic-session.target state; skipping COSMIC helper startup" >&2
-                        fi
+                        echo "regolith-session: failed to query cosmic-session.target state; skipping COSMIC helper startup" >&2
                     fi
                 fi
             else
