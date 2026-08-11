@@ -80,6 +80,8 @@ fi
 has_line "$ROOT_DIR/debian/control" "Package: regolith-session-gnome-target" || fail "dedicated GNOME target package is missing from control"
 gnome_package_control="$(sed -n '/^Package: regolith-session-gnome-target$/,/^Package: /p' "$ROOT_DIR/debian/control")"
 printf '%s\n' "$gnome_package_control" | grep -Fq "Description:" || fail "dedicated GNOME target package has no description"
+printf '%s\n' "$gnome_package_control" | grep -Fqx "Replaces: regolith-session-common, regolith-session-sway" \
+  || fail "dedicated GNOME target package does not replace prior common and sway owners"
 cosmic_control="$(sed -n '/^Package: regolith-session-cosmic$/,/^Package: /p' "$ROOT_DIR/debian/control")"
 if printf '%s\n' "$cosmic_control" | grep -Eq '^    regolith-session-gnome-target([ ,]|$)'; then
   fail "COSMIC package depends on the GNOME target payload"

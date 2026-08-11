@@ -81,7 +81,7 @@ Description: Regolith customized SwayWM session
 Package: regolith-session-gnome-target
 Architecture: all
 Depends: ${misc:Depends}
-Replaces: regolith-session-common
+Replaces: regolith-session-common, regolith-session-sway
 Description: GNOME target integration for Regolith sessions
  This package contains the GNOME session target and parent drop-in used by
  the GNOME-backed Regolith session packages.
