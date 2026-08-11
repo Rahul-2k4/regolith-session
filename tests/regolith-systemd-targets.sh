@@ -12,6 +12,16 @@ COSMIC_RUNTIME="$ROOT_DIR/usr/lib/regolith/regolith-session-cosmic-runtime"
 fail() { echo "systemd target test: $*" >&2; exit 1; }
 has_line() { grep -Fqx "$2" "$1"; }
 exactly_once() { [ "$(grep -Fxc "$2" "$1")" -eq 1 ]; }
+package_stanza() {
+  local package=$1 control_file=$2
+  awk -v package="$package" '
+    /^Package: / {
+      if (found) exit
+      found = ($2 == package)
+    }
+    found { print }
+  ' "$control_file"
+}
 trim_install_path() {
   local path=$1
   path="${path#"${path%%[![:space:]]*}"}"
@@ -106,7 +116,9 @@ for cosmic_path in "${cosmic_only_paths[@]}"; do
     done < "$install_file"
   done
 done
-cosmic_control="$(sed -n '/^Package: regolith-session-cosmic$/,/^Package: /p' "$ROOT_DIR/debian/control")"
+common_control="$(package_stanza regolith-session-common "$ROOT_DIR/debian/control")"
+printf '%s\n' "$common_control" | grep -Fqx "Replaces: regolith-session-sway" \
+  || fail "session-common does not declare the regolith-session-sway ownership transition"
 has_line "$ROOT_DIR/debian/regolith-session-sway.install" "usr/share/wayland-sessions/regolith-wayland.desktop" || fail "Sway Wayland desktop entry is not packaged explicitly"
 if grep -Fqx "usr/share/wayland-sessions" "$ROOT_DIR/debian/regolith-session-sway.install"; then fail "Sway package uses a broad Wayland desktop entry wildcard"; fi
 if comm -12 <(sed -n "s#^usr/share/wayland-sessions/##p" "$ROOT_DIR/debian/regolith-session-sway.install" | sort) <(sed -n "s#^usr/share/wayland-sessions/##p" "$ROOT_DIR/debian/regolith-session-cosmic.install" | sort) | grep -q .; then fail "Sway and COSMIC packages own the same Wayland desktop entry"; fi
