@@ -54,8 +54,9 @@ done
 
 printf '%s\n' "$gnome_targets_control" | grep -Eq '^Replaces:.*regolith-session-common' || \
     fail "GNOME target package does not replace the former common ownership"
-printf '%s\n' "$gnome_targets_control" | grep -Eq '^Breaks:.*regolith-session-common' || \
-    fail "GNOME target package does not break incompatible common ownership"
+if printf '%s\n' "$gnome_targets_control" | grep -Eq '^Breaks:.*(regolith-session-common|regolith-session-sway)'; then
+    fail "GNOME target package introduces a predecessor Breaks relationship"
+fi
 if printf '%s\n' "$common_control" | grep -Eq '^[[:space:]]+regolith-resource-loader([,[:space:]]|$)'; then
     fail "regolith-session-common depends on nonexistent regolith-resource-loader"
 fi
