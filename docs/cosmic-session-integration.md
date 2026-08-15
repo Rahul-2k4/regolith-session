@@ -26,8 +26,8 @@ The launcher initializes Regolith trawl resources, sets `XDG_CURRENT_DESKTOP=Reg
 
 - COSMIC runtime owns `cosmic-settings-daemon` and delayed `cosmic-osd` startup.
 - `cosmolith` starts after the Sway IPC socket is available.
-- regolith-cosmic.target is installed WantedBy=cosmic-session.target and wants regolith-init-inputd.service and regolith-init-displayd.service.
-- regolith-gnome.target is installed WantedBy=gnome-session.target and wants inputd, displayd, and regolith-init-kanshi.service; kanshi remains GNOME-only.
+- regolith-cosmic.target is installed WantedBy=cosmic-session.target and wants regolith-init-inputd.service, regolith-init-displayd.service, regolith-init-kanshi.service, and regolith-init-cosmic-idle.service.
+- regolith-gnome.target is installed WantedBy=gnome-session.target and wants inputd, displayd, and regolith-init-kanshi.service; the existing Kanshi persistence path is shared by both session targets.
 - The COSMIC launcher does not mask, stop, reset, or directly start the target-owned inputd/displayd/kanshi services.
 - cosmic-idle is opt-in with REGOLITH_COSMIC_ENABLE_IDLE=true until lock/idle validation is complete.
 
