@@ -70,15 +70,16 @@ line_number() {
 }
 
 import_line="$(line_number 'systemctl --user import-environment XDG_CURRENT_DESKTOP WAYLAND_DISPLAY SWAYSOCK')"
+start_target_line="$(line_number 'systemctl --user start regolith-cosmic.target')"
 restart_line="$(line_number 'systemctl --user restart regolith-cosmic.target')"
 start_line="$(line_number 'systemctl --user start cosmic-session.target')"
 unset_line="$(line_number 'systemctl --user unset-environment XDG_CURRENT_DESKTOP WAYLAND_DISPLAY SWAYSOCK')"
 
 [ -n "$import_line" ] || { echo "missing XDG_CURRENT_DESKTOP, WAYLAND_DISPLAY, and SWAYSOCK import" >&2; exit 1; }
-[ -n "$restart_line" ] || { echo "missing COSMIC target reinitialization" >&2; exit 1; }
-[ -z "$start_line" ] || { echo "COSMIC target must be reinitialized, not merely started" >&2; exit 1; }
+[ -n "$start_target_line" ] || { echo "missing COSMIC target reinitialization" >&2; exit 1; }
+[ -z "$restart_line" ] || { echo "COSMIC target must be reinitialized with start, not restart" >&2; exit 1; }
 [ -n "$unset_line" ] || { echo "missing WAYLAND_DISPLAY and SWAYSOCK cleanup" >&2; exit 1; }
-[ "$import_line" -lt "$restart_line" ] || { echo "compositor environment import must precede target reinitialization" >&2; exit 1; }
-[ "$restart_line" -lt "$unset_line" ] || { echo "compositor environment cleanup must follow target lifecycle" >&2; exit 1; }
+[ "$import_line" -lt "$start_target_line" ] || { echo "compositor environment import must precede target reinitialization" >&2; exit 1; }
+[ "$start_target_line" -lt "$unset_line" ] || { echo "compositor environment cleanup must follow target lifecycle" >&2; exit 1; }
 
 echo "COSMIC runtime environment lifecycle: PASS"
