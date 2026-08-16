@@ -64,4 +64,5 @@ if ! printf '%s\n' "$common_control" | grep -Eq '^[[:space:]]+regolith-look-defa
     fail "regolith-session-common does not depend on regolith-look-default-loader"
 fi
 
+grep -Fxq "usr/lib/systemd/user/regolith-cosmic.target" "$ROOT_DIR/debian/regolith-session-cosmic.install" || fail "COSMIC package does not own its target"
 echo "session package metadata: PASS"

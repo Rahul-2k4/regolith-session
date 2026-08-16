@@ -10,7 +10,7 @@ FALLBACK="$ROOT_DIR/usr/lib/regolith/regolith-cosmic-idle-fallback"
 fail() { echo "COSMIC idle fallback test: $*" >&2; exit 1; }
 has_line() { grep -Fqx "$2" "$1"; }
 
-has_line "$TARGET" "Wants=regolith-init-inputd.service regolith-init-displayd.service regolith-init-cosmic-idle.service" || fail "COSMIC target does not own the idle service"
+has_line "$TARGET" "Wants=regolith-init-inputd.service regolith-init-displayd.service regolith-init-cosmic-idle.service regolith-init-kanshi.service" || fail "COSMIC target helper ownership is incomplete"
 has_line "$SERVICE" "ExecStart=/usr/lib/regolith/regolith-cosmic-idle-fallback" || fail "idle service does not execute the fallback"
 if grep -Fq "ExecStart=/usr/bin/cosmic-idle" "$SERVICE"; then fail "default idle service starts native cosmic-idle"; fi
 has_line "$SERVICE" "PartOf=regolith-cosmic.target" || fail "idle service is not stopped with the COSMIC target"

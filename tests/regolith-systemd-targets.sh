@@ -67,9 +67,8 @@ if grep -Fqx "Wants=gnome-session.target" "$GNOME_TARGET"; then fail "GNOME pare
 has_line "$COSMIC_TARGET" "After=cosmic-session.target" || fail "COSMIC ordering is missing"
 has_line "$COSMIC_TARGET" "PartOf=cosmic-session.target" || fail "COSMIC ownership is missing"
 has_line "$COSMIC_TARGET" "WantedBy=cosmic-session.target" || fail "COSMIC install wiring is missing"
-has_line "$COSMIC_TARGET" "Wants=regolith-init-inputd.service regolith-init-displayd.service regolith-init-cosmic-idle.service" || fail "COSMIC idle owner is not target-owned"
+has_line "$COSMIC_TARGET" "Wants=regolith-init-inputd.service regolith-init-displayd.service regolith-init-cosmic-idle.service regolith-init-kanshi.service" || fail "COSMIC helper Wants are incomplete"
 if grep -Fqx "Wants=cosmic-session.target" "$COSMIC_TARGET"; then fail "COSMIC parent dependency cycle"; fi
-if grep -Fq "kanshi" "$COSMIC_TARGET"; then fail "COSMIC target pulls kanshi"; fi
 if grep -Fq "regolith-init-cosmic-idle.service" "$GNOME_TARGET"; then fail "GNOME target activates COSMIC idle"; fi
 [ -f "$COSMIC_IDLE_SERVICE" ] || fail "missing COSMIC idle service"
 [ -f "$COSMIC_RUNTIME" ] || fail "missing COSMIC runtime wrapper"

@@ -2,7 +2,7 @@
 Description=Regolith COSMIC session helpers
 After=cosmic-session.target
 PartOf=cosmic-session.target
-Wants=regolith-init-inputd.service regolith-init-displayd.service regolith-init-cosmic-idle.service
+Wants=regolith-init-inputd.service regolith-init-displayd.service regolith-init-cosmic-idle.service regolith-init-kanshi.service
 
 [Install]
 WantedBy=cosmic-session.target
