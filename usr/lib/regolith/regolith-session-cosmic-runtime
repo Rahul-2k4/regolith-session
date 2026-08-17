@@ -188,7 +188,7 @@ regolith_cosmic_runtime_main() {
                 systemctl --user import-environment XDG_CURRENT_DESKTOP WAYLAND_DISPLAY SWAYSOCK
 
                 if systemctl --user is-active --quiet cosmic-session.target; then
-                    if ! systemctl --user restart regolith-cosmic.target; then
+                    if ! systemctl --user start regolith-cosmic.target; then
                         echo "regolith-session: failed to reinitialize COSMIC helper target; aborting COSMIC session" >&2
                         regolith_cosmic_runtime_abort_session 1
                         return $?
