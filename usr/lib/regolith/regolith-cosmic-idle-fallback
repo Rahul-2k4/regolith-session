@@ -2,6 +2,29 @@
 
 set -Eeu -o pipefail
 
+# The Regolith COSMIC session currently runs Sway under cosmic-session. The
+# desktop marker is therefore not enough to prove that cosmic-comp owns the
+# Wayland session.
+regolith_cosmic_native_session_present() {
+    case ":${XDG_CURRENT_DESKTOP-}:" in
+        *:COSMIC:*)
+            command -v cosmic-comp >/dev/null 2>&1 || return 1
+            pgrep -x cosmic-comp >/dev/null 2>&1
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+if regolith_cosmic_native_session_present; then
+    command -v cosmic-idle >/dev/null 2>&1 || {
+        echo "regolith-cosmic-idle: cosmic-idle is unavailable for native COSMIC" >&2
+        exit 1
+    }
+    exec cosmic-idle
+fi
+
 if [ -z "${SWAYSOCK-}" ] || [ ! -S "$SWAYSOCK" ]; then
     echo "regolith-cosmic-idle: SWAYSOCK is unavailable" >&2
     exit 1
