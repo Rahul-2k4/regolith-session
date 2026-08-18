@@ -115,6 +115,9 @@ Architecture: any
 Depends: ${misc:Depends},
     regolith-resource-loader
 Breaks: regolith-session (<= 1.1.2)
+Replaces: regolith-session-sway,
+    regolith-session-flashback,
+    regolith-session-gnome-targets
 Conflicts: session-shortcuts, regolith-session-flashback (<= 0.6.4)
 Description: Common files for regolith X11 session
  This package contains common scripts required by regolith-session variants.
