@@ -62,4 +62,9 @@ for legacy_owner in \
   done
 done
 
+package_test_override=$(sed -n '/^override_dh_auto_test:/,/^endif$/p' "$ROOT_DIR/debian/rules")
+printf '%s\n' "$package_test_override" \
+  | grep -Eq '^[[:space:]]+bash tests/regolith-session-common-ownership-transition\.sh$' \
+  || fail "ownership transition test is not wired into override_dh_auto_test"
+
 echo "session-common ownership transition: PASS"
