@@ -50,11 +50,9 @@ has_unversioned_entry() {
 }
 
 source_version=$(sed -n '1s/^regolith-session (\([^)]*\)).*/\1/p' "$CHANGELOG")
-[ "$source_version" = "1.2.0-1ubuntu2" ] \
-  || fail "source version must be 1.2.0-1ubuntu2"
-source_revision=${source_version#1.2.0-1ubuntu}
-[[ "$source_revision" =~ ^[0-9]+$ ]] \
+[[ "$source_version" =~ ^1\.2\.0-1ubuntu([0-9]+)$ ]] \
   || fail "source version must retain the 1.2.0-1ubuntu revision shape"
+source_revision=${BASH_REMATCH[1]}
 (( 10#$source_revision > 1 )) \
   || fail "source version must be newer than 1.2.0-1ubuntu1"
 
@@ -77,5 +75,10 @@ for legacy_owner in \
     fi
   done
 done
+
+package_test_override=$(sed -n '/^override_dh_auto_test:/,/^endif$/p' "$ROOT_DIR/debian/rules")
+printf '%s\n' "$package_test_override" \
+  | grep -Eq '^[[:space:]]+bash tests/test_package_ownership\.sh$' \
+  || fail "package ownership test is not wired into override_dh_auto_test"
 
 echo "package ownership test: PASS"
