@@ -1,3 +1,9 @@
+regolith-session (1.2.0-1ubuntu2) noble; urgency=medium
+
+  * Move GNOME target-unit ownership to session-common.
+
+ -- Rahul Tripathi <rahultripathi7009@gmail.com>  Tue, 18 Aug 2026 00:00:00 +0530
+
 regolith-session (1.2.0-1ubuntu1) noble; urgency=medium
 
   [ Ken Gilmer ]
