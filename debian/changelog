@@ -1,3 +1,10 @@
+regolith-session (1.2.0-1ubuntu1-2-1regolith-resolute) resolute; urgency=medium
+
+  * Bump version past stale QEMU test-image baseline (apt downgrade
+    conflict)
+
+ -- Regolith Linux <regolith.linux@gmail.com>  Tue, 18 Aug 2026 19:20:41 +0530
+
 regolith-session (1.2.0-1ubuntu1) noble; urgency=medium
 
   [ Ken Gilmer ]
