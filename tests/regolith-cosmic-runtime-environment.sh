@@ -68,13 +68,13 @@ line_number() {
     awk -v event="$event" '$0 == event { print NR; exit }' "$log_file"
 }
 
-import_line="$(line_number 'systemctl --user import-environment WAYLAND_DISPLAY SWAYSOCK')"
+import_line="$(line_number 'systemctl --user import-environment WAYLAND_DISPLAY SWAYSOCK XDG_CURRENT_DESKTOP')"
 start_line="$(line_number 'systemctl --user start cosmic-session.target')"
-unset_line="$(line_number 'systemctl --user unset-environment WAYLAND_DISPLAY SWAYSOCK')"
+unset_line="$(line_number 'systemctl --user unset-environment WAYLAND_DISPLAY SWAYSOCK XDG_CURRENT_DESKTOP')"
 
-[ -n "$import_line" ] || { echo "missing WAYLAND_DISPLAY and SWAYSOCK import" >&2; exit 1; }
+[ -n "$import_line" ] || { echo "missing WAYLAND_DISPLAY, SWAYSOCK, and XDG_CURRENT_DESKTOP import" >&2; exit 1; }
 [ -n "$start_line" ] || { echo "missing COSMIC target start" >&2; exit 1; }
-[ -n "$unset_line" ] || { echo "missing WAYLAND_DISPLAY and SWAYSOCK cleanup" >&2; exit 1; }
+[ -n "$unset_line" ] || { echo "missing WAYLAND_DISPLAY, SWAYSOCK, and XDG_CURRENT_DESKTOP cleanup" >&2; exit 1; }
 [ "$import_line" -lt "$start_line" ] || { echo "compositor environment import must precede target start" >&2; exit 1; }
 [ "$start_line" -lt "$unset_line" ] || { echo "compositor environment cleanup must follow target lifecycle" >&2; exit 1; }
 
