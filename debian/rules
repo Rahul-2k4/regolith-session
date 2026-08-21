@@ -8,6 +8,7 @@ ifneq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 	dh_auto_test
 else
 	bash tests/regolith-cosmic-runtime-teardown.sh
+	bash tests/regolith-cosmic-runtime-not-found-legacy-target.sh
 	bash tests/regolith-systemd-targets.sh
 	dh_auto_test
 endif
