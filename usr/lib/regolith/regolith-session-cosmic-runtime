@@ -26,6 +26,13 @@ regolith_legacy_target_is_pre_masked() {
         enabled|enabled-runtime|linked|linked-runtime|disabled|static|indirect|generated|transient|alias)
             return 1
             ;;
+        not-found|"")
+            # The unit does not exist on this install at all (e.g. a
+            # COSMIC-only install that never pulled in the GNOME-targets
+            # package). That is not masked, so treat it the same as
+            # "disabled": nothing to preserve, safe to mask for COSMIC.
+            return 1
+            ;;
     esac
 
     echo "regolith-session: failed to establish mask state for $target; skipping COSMIC helper startup" >&2
