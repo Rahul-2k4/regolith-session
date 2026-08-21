@@ -1,3 +1,11 @@
+regolith-session (1.2.0-1ubuntu1-3-1regolith-resolute) resolute; urgency=medium
+
+  * Treat a never-installed legacy Regolith unit (systemctl is-enabled:
+    not-found) the same as disabled, so a COSMIC-only install does not
+    abort the session at login.
+
+ -- Regolith Linux <regolith.linux@gmail.com>  Fri, 21 Aug 2026 19:32:19 +0530
+
 regolith-session (1.2.0-1ubuntu1) noble; urgency=medium
 
   [ Ken Gilmer ]
