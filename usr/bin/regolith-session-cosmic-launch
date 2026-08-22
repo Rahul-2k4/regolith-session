@@ -51,6 +51,10 @@ export XDG_CURRENT_DESKTOP="Regolith-Wayland:COSMIC:sway"
 export XDG_SESSION_DESKTOP="cosmic"
 export DESKTOP_SESSION="cosmic"
 
+# The COSMIC target is pulled in as soon as cosmic-session starts. Import the
+# desktop identity before that transaction so inputd and displayd select the
+# COSMIC backend even before Sway IPC is available.
+systemctl --user import-environment XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP XDG_SESSION_TYPE
 
 regolith_cosmic_configure_status_bar "$(trawlcat wm.bar.status_config /etc/regolith/i3status-rust/config.toml)"
 
