@@ -12,6 +12,66 @@ legacy_gnome_target_mask_owned=false
 legacy_wayland_target_mask_owned=false
 legacy_powerd_mask_owned=false
 
+regolith_cosmic_session_send_environment() {
+    local socket_fd="${COSMIC_SESSION_SOCK:-}"
+    local wayland_display="${WAYLAND_DISPLAY:-}"
+    local display="${DISPLAY:-}"
+    local variables=""
+    local payload=""
+    local payload_length=0
+    local length_low=0
+    local length_high=0
+
+    if [ -z "$socket_fd" ]; then
+        return 0
+    fi
+
+    if ! [[ "$socket_fd" =~ ^[0-9]+$ ]]; then
+        echo "regolith-session: invalid COSMIC_SESSION_SOCK fd" >&2
+        return 1
+    fi
+
+    if [ -n "$wayland_display" ]; then
+        case "$wayland_display" in
+            *[!A-Za-z0-9_.:/-]*)
+                echo "regolith-session: unsupported WAYLAND_DISPLAY for COSMIC handshake" >&2
+                return 1
+                ;;
+        esac
+        variables="\"WAYLAND_DISPLAY\":\"$wayland_display\""
+    fi
+
+    if [ -n "$display" ]; then
+        case "$display" in
+            *[!A-Za-z0-9_.:/-]*)
+                echo "regolith-session: unsupported DISPLAY for COSMIC handshake" >&2
+                return 1
+                ;;
+        esac
+        if [ -n "$variables" ]; then
+            variables="\"WAYLAND_DISPLAY\":\"$wayland_display\",\"DISPLAY\":\"$display\""
+        else
+            variables="\"DISPLAY\":\"$display\""
+        fi
+    fi
+
+    if [ -z "$variables" ]; then
+        echo "regolith-session: no compositor environment for COSMIC handshake" >&2
+        return 1
+    fi
+
+    payload="{\"message\":\"set_env\",\"variables\":{$variables}}"
+    payload_length=${#payload}
+    if [ "$payload_length" -gt 65535 ]; then
+        echo "regolith-session: COSMIC handshake payload is too large" >&2
+        return 1
+    fi
+
+    length_low=$((payload_length & 255))
+    length_high=$((payload_length >> 8))
+    printf '%b%s' "\\x$(printf '%02x' "$length_low")\\x$(printf '%02x' "$length_high")" "$payload" >&"$socket_fd"
+}
+
 regolith_legacy_target_is_pre_masked() {
     local target="$1"
     local state=
@@ -185,6 +245,12 @@ regolith_cosmic_runtime_main() {
     if wait_for_regolith_cosmic_wayland_socket; then
         if wait_for_regolith_cosmic_sway_socket; then
             if kill -0 "$compositor_pid" >/dev/null 2>&1; then
+                if ! regolith_cosmic_session_send_environment; then
+                    echo "regolith-session: failed to send COSMIC session environment" >&2
+                    regolith_cosmic_runtime_abort_session 1
+                    return $?
+                fi
+
                 systemctl --user import-environment XDG_CURRENT_DESKTOP WAYLAND_DISPLAY SWAYSOCK
 
                 if systemctl --user is-active --quiet regolith-cosmic.target; then
