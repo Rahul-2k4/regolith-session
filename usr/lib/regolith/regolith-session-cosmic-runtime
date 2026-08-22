@@ -82,7 +82,7 @@ regolith_legacy_target_is_pre_masked() {
         masked|masked-runtime)
             return 0
             ;;
-        enabled|enabled-runtime|linked|linked-runtime|disabled|static|indirect|generated|transient|alias)
+        enabled|enabled-runtime|linked|linked-runtime|disabled|static|indirect|generated|transient|alias|not-found)
             return 1
             ;;
     esac
