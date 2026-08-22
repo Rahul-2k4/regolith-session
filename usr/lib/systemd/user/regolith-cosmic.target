@@ -1,6 +1,7 @@
 [Unit]
 Description=Regolith COSMIC session helpers
 After=cosmic-session.target
+ConditionEnvironment=XDG_CURRENT_DESKTOP=Regolith-Wayland:COSMIC:sway
 PartOf=cosmic-session.target
 Wants=regolith-init-inputd.service regolith-init-displayd.service regolith-init-cosmic-idle.service
 

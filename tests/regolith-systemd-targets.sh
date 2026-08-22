@@ -26,6 +26,7 @@ has_line "$GNOME_TARGET" "WantedBy=gnome-session.target" || fail "GNOME install 
 has_line "$GNOME_TARGET" "Wants=regolith-init-inputd.service regolith-init-displayd.service regolith-init-kanshi.service" || fail "GNOME helper Wants are incomplete"
 if grep -Fqx "Wants=gnome-session.target" "$GNOME_TARGET"; then fail "GNOME parent dependency cycle"; fi
 has_line "$COSMIC_TARGET" "After=cosmic-session.target" || fail "COSMIC ordering is missing"
+has_line "$COSMIC_TARGET" "ConditionEnvironment=XDG_CURRENT_DESKTOP=Regolith-Wayland:COSMIC:sway" || fail "COSMIC target must wait for imported desktop environment"
 has_line "$COSMIC_TARGET" "PartOf=cosmic-session.target" || fail "COSMIC ownership is missing"
 has_line "$COSMIC_TARGET" "WantedBy=cosmic-session.target" || fail "COSMIC install wiring is missing"
 has_line "$COSMIC_TARGET" "Wants=regolith-init-inputd.service regolith-init-displayd.service regolith-init-cosmic-idle.service" || fail "COSMIC idle owner is not target-owned"
