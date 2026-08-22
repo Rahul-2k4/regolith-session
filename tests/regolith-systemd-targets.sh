@@ -5,7 +5,6 @@ ROOT_DIR=$(cd "$(dirname "$0")/.." && pwd)
 GNOME_TARGET="$ROOT_DIR/usr/lib/systemd/user/regolith-gnome.target"
 COSMIC_TARGET="$ROOT_DIR/usr/lib/systemd/user/regolith-cosmic.target"
 GNOME_DROPIN="$ROOT_DIR/usr/lib/systemd/user/gnome-session.target.d/regolith-gnome.conf"
-COSMIC_DROPIN="$ROOT_DIR/usr/lib/systemd/user/cosmic-session.target.d/regolith-cosmic.conf"
 COSMIC_IDLE_SERVICE="$ROOT_DIR/usr/lib/systemd/user/regolith-init-cosmic-idle.service"
 COSMIC_RUNTIME="$ROOT_DIR/usr/lib/regolith/regolith-session-cosmic-runtime"
 
@@ -15,11 +14,9 @@ has_line() { grep -Fqx "$2" "$1"; }
 [ -f "$GNOME_TARGET" ] || fail "missing GNOME target"
 [ -f "$COSMIC_TARGET" ] || fail "missing COSMIC target"
 [ -f "$GNOME_DROPIN" ] || fail "missing GNOME parent drop-in"
-[ -f "$COSMIC_DROPIN" ] || fail "missing COSMIC parent drop-in"
 has_line "$GNOME_DROPIN" "[Unit]" || fail "GNOME parent drop-in section is missing"
 has_line "$GNOME_DROPIN" "Wants=regolith-gnome.target" || fail "GNOME parent drop-in wiring is missing"
-has_line "$COSMIC_DROPIN" "[Unit]" || fail "COSMIC parent drop-in section is missing"
-has_line "$COSMIC_DROPIN" "Wants=regolith-cosmic.target" || fail "COSMIC parent drop-in wiring is missing"
+[ ! -e "$ROOT_DIR/usr/lib/systemd/user/cosmic-session.target.d/regolith-cosmic.conf" ] || fail "COSMIC parent drop-in must not start helpers before compositor readiness"
 has_line "$GNOME_TARGET" "After=gnome-session.target" || fail "GNOME ordering is missing"
 has_line "$GNOME_TARGET" "PartOf=gnome-session.target" || fail "GNOME ownership is missing"
 has_line "$GNOME_TARGET" "WantedBy=gnome-session.target" || fail "GNOME install wiring is missing"
@@ -44,7 +41,9 @@ grep -Fq 'unset-environment XDG_CURRENT_DESKTOP WAYLAND_DISPLAY SWAYSOCK' "$COSM
 has_line "$ROOT_DIR/debian/regolith-session-common.install" "usr/lib/systemd/user/regolith-gnome.target" || fail "GNOME target is not packaged in session-common"
 has_line "$ROOT_DIR/debian/regolith-session-common.install" "usr/lib/systemd/user/gnome-session.target.d" || fail "GNOME parent drop-in is not packaged in session-common"
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/user/regolith-cosmic.target" || fail "COSMIC target is not packaged"
-has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/user/cosmic-session.target.d" || fail "COSMIC parent drop-in is not packaged"
+if grep -Fqx "usr/lib/systemd/user/cosmic-session.target.d" "$ROOT_DIR/debian/regolith-session-cosmic.install"; then
+    fail "COSMIC parent drop-in must not be packaged"
+fi
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/user/regolith-init-cosmic-idle.service" || fail "COSMIC idle service is not packaged"
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/regolith/regolith-session-cosmic-runtime" || fail "COSMIC runtime is not packaged"
 cosmic_control="$(sed -n '/^Package: regolith-session-cosmic$/,/^Package: /p' "$ROOT_DIR/debian/control")"
