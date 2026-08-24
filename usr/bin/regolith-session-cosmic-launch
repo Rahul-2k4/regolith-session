@@ -8,6 +8,7 @@ source /usr/lib/regolith/regolith-session-common.sh
 source /usr/lib/regolith/regolith-session-cosmic.sh
 
 COSMIC_RUNTIME_WRAPPER="/usr/lib/regolith/regolith-session-cosmic-runtime"
+COSMIC_SESSION_BUS_WRAPPER="/usr/lib/regolith/regolith-session-cosmic-bus"
 
 if ! command -v cosmic-session >/dev/null 2>&1; then
     echo "regolith-session: cosmic-session is not installed" >&2
@@ -65,4 +66,4 @@ if [[ "${unsupported_gpu,,}" == "true" ]]; then
 fi
 
 echo "Regolith is launching COSMIC session with Sway using $SWAY_CONFIG_FILE"
-exec dbus-run-session -- /usr/bin/cosmic-session "${sway_command[@]}"
+exec dbus-run-session -- "$COSMIC_SESSION_BUS_WRAPPER" /usr/bin/cosmic-session "${sway_command[@]}"

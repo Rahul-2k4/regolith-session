@@ -9,6 +9,7 @@ ifneq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 else
 	bash tests/regolith-cosmic-legacy-target-optional.sh
 	bash tests/regolith-cosmic-runtime-teardown.sh
+	bash tests/regolith-cosmic-bus-environment.sh
 	bash tests/regolith-systemd-targets.sh
 	dh_auto_test
 endif

@@ -1,0 +1,9 @@
+#!/bin/bash
+
+set -Eeu -o pipefail
+
+# GDM starts COSMIC through dbus-run-session. Import the desktop identity on
+# that bus before cosmic-session activates helper units in the user manager.
+systemctl --user import-environment XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP XDG_SESSION_TYPE
+
+exec "$@"
