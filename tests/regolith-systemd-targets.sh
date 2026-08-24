@@ -10,6 +10,35 @@ COSMIC_RUNTIME="$ROOT_DIR/usr/lib/regolith/regolith-session-cosmic-runtime"
 
 fail() { echo "systemd target test: $*" >&2; exit 1; }
 has_line() { grep -Fqx "$2" "$1"; }
+exactly_once() { [ "$(grep -Fxc "$2" "$1")" -eq 1 ]; }
+trim_install_path() {
+  local path=$1
+  path="${path#"${path%%[![:space:]]*}"}"
+  path="${path%"${path##*[![:space:]]}"}"
+  while [[ "$path" == */ ]]; do path=${path%/}; done
+  printf '%s\n' "$path"
+}
+paths_overlap() {
+  local first=$1 second=$2
+  [[ "$first" == "$second" || "$first" == "$second"/* || "$second" == "$first"/* ]]
+}
+validate_install_manifest() {
+  local install_file=$1 line_number=0 raw_line entry
+  while IFS= read -r raw_line || [ -n "$raw_line" ]; do
+    line_number=$((line_number + 1))
+    entry=$(trim_install_path "$raw_line")
+    case "$entry" in
+      ""|\#*) continue ;;
+    esac
+    if [[ "$entry" == *'*'* || "$entry" == *'?'* || "$entry" == *'['* || "$entry" == *']'* ]]; then
+      fail "unsupported wildcard syntax in $(basename "$install_file"):$line_number"
+    fi
+    case "$entry" in
+      -*|*\\*) fail "unsupported dh_install syntax in $(basename "$install_file"):$line_number" ;;
+      *[[:space:]]*) fail "source/destination syntax is not supported in $(basename "$install_file"):$line_number" ;;
+    esac
+  done < "$install_file"
+}
 
 [ -f "$GNOME_TARGET" ] || fail "missing GNOME target"
 [ -f "$COSMIC_TARGET" ] || fail "missing COSMIC target"
@@ -46,6 +75,37 @@ if grep -Fqx "usr/lib/systemd/user/cosmic-session.target.d" "$ROOT_DIR/debian/re
 fi
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/systemd/user/regolith-init-cosmic-idle.service" || fail "COSMIC idle service is not packaged"
 has_line "$ROOT_DIR/debian/regolith-session-cosmic.install" "usr/lib/regolith/regolith-session-cosmic-runtime" || fail "COSMIC runtime is not packaged"
+for install_file in "$ROOT_DIR"/debian/regolith-session-*.install; do
+  [ -f "$install_file" ] || continue
+  validate_install_manifest "$install_file"
+done
+cosmic_only_paths=()
+while IFS= read -r raw_line || [ -n "$raw_line" ]; do
+  cosmic_path=$(trim_install_path "$raw_line")
+  case "$cosmic_path" in
+    ""|\#*) continue ;;
+  esac
+  cosmic_only_paths+=("$cosmic_path")
+done < "$ROOT_DIR/debian/regolith-session-cosmic.install"
+for cosmic_path in "${cosmic_only_paths[@]}"; do
+  exactly_once "$ROOT_DIR/debian/regolith-session-cosmic.install" "$cosmic_path" \
+    || fail "COSMIC artifact is not owned exactly once by session-cosmic: $cosmic_path"
+  for install_file in "$ROOT_DIR"/debian/regolith-session-*.install; do
+    [ -f "$install_file" ] || continue
+    case "$install_file" in
+      *regolith-session-cosmic.install) continue ;;
+    esac
+    while IFS= read -r sibling_path || [ -n "$sibling_path" ]; do
+      sibling_path=$(trim_install_path "$sibling_path")
+      case "$sibling_path" in
+        ""|\#*) continue ;;
+      esac
+      if paths_overlap "$cosmic_path" "$sibling_path"; then
+        fail "COSMIC-only artifact overlaps $(basename "$install_file"): $cosmic_path / $sibling_path"
+      fi
+    done < "$install_file"
+  done
+done
 cosmic_control="$(sed -n '/^Package: regolith-session-cosmic$/,/^Package: /p' "$ROOT_DIR/debian/control")"
 has_line "$ROOT_DIR/debian/regolith-session-sway.install" "usr/share/wayland-sessions/regolith-wayland.desktop" || fail "Sway Wayland desktop entry is not packaged explicitly"
 if grep -Fqx "usr/share/wayland-sessions" "$ROOT_DIR/debian/regolith-session-sway.install"; then fail "Sway package uses a broad Wayland desktop entry wildcard"; fi
