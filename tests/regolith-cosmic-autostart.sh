@@ -29,6 +29,38 @@ stub_dir="$workdir/bin"
 runtime_dir="$workdir/runtime"
 mkdir -p "$stub_dir" "$runtime_dir"
 
+# shellcheck disable=SC1090
+source "$ROOT_DIR/tests/test-helpers/portable-setsid.sh"
+install_portable_setsid_stub "$stub_dir"
+
+assert_portable_setsid_handles_process_group_leader() {
+    if [ ! -x "$stub_dir/setsid" ]; then
+        return 0
+    fi
+
+    python3 - "$stub_dir/setsid" <<'PY'
+import os
+import sys
+
+setsid_path = sys.argv[1]
+child_pid = os.fork()
+if child_pid == 0:
+    # Force the shim into the exact case handled by util-linux setsid: the
+    # caller is already a process-group leader and must fork before setsid.
+    os.setpgid(0, 0)
+    os.execv(
+        setsid_path,
+        [setsid_path, "--", sys.executable, "-c", "import os; raise SystemExit(os.getsid(0) != os.getpid())"],
+    )
+
+_, status = os.waitpid(child_pid, 0)
+if not os.WIFEXITED(status) or os.WEXITSTATUS(status) != 0:
+    raise SystemExit("portable setsid fixture failed for a process-group leader")
+PY
+}
+
+assert_portable_setsid_handles_process_group_leader
+
 make_stub() {
     local command_name="$1"
 
@@ -169,7 +201,11 @@ wait_for_log_entry() {
     local entry="$1"
     local _=
 
-    for _ in $(seq 1 20); do
+    # Process-group creation plus the delayed helper can exceed one second
+    # when several shell tests run concurrently on a development host.  Keep
+    # the assertion bounded, but give the child a deterministic readiness
+    # window instead of making the result depend on host load.
+    for _ in $(seq 1 100); do
         if [ -f "$log_file" ] && grep -qx "$entry" "$log_file"; then
             return 0
         fi

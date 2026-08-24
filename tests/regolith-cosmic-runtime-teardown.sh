@@ -19,6 +19,9 @@ trap cleanup EXIT
 stub_dir="$workdir/bin"
 runtime_dir="$workdir/runtime"
 mkdir -p "$stub_dir" "$runtime_dir/regolith-cosmic"
+# shellcheck disable=SC1090
+source "$ROOT_DIR/tests/test-helpers/portable-setsid.sh"
+install_portable_setsid_stub "$stub_dir"
 
 helper_script="$workdir/helpers.sh"
 printf 'source "%s/usr/lib/regolith/regolith-session-cosmic.sh"\n' "$ROOT_DIR/" >"$helper_script"

@@ -9,6 +9,9 @@ trap cleanup EXIT
 
 stub_dir="$workdir/bin"
 mkdir -p "$stub_dir"
+# shellcheck disable=SC1090
+source "$ROOT_DIR/tests/test-helpers/portable-setsid.sh"
+install_portable_setsid_stub "$stub_dir"
 log_file="$workdir/events.log"
 runtime_script="$workdir/runtime.sh"
 helper_script="$workdir/helper.sh"
